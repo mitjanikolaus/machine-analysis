@@ -1,3 +1,5 @@
+import os
+import dill
 from seq2seq.models import DecoderRNN
 from seq2seq.models import EncoderRNN
 from seq2seq.models import Seq2seq
@@ -5,11 +7,17 @@ from seq2seq.models.attention import MLP, Dot, HardGuidance, Concat
 from seq2seq.util.checkpoint import Checkpoint
 from torch.nn import GRU, LSTM
 
+import torch.nn.functional as F
+
+
+from .HiddenStateAnalysisDecoderRNN import HiddenStateAnalysisDecoderRNN
 
 class AnalysableSeq2seq(Seq2seq):
 
+
     @staticmethod
     def load(path_to_checkpoint: str):
+
 
         checkpoint = Checkpoint.load(path_to_checkpoint)
 
@@ -39,7 +47,7 @@ class AnalysableSeq2seq(Seq2seq):
             raise ImportError('Model trained with unknown rnn cell type, cannot be loaded')
 
         # TODO: override Decoder and Encoder to provide required stats
-        decoder = DecoderRNN(
+        decoder = HiddenStateAnalysisDecoderRNN(
             vocab_size=len(checkpoint.output_vocab),
             max_len=checkpoint.model.decoder.max_len,
             hidden_size=checkpoint.model.decoder.hidden_size,
@@ -70,4 +78,17 @@ class AnalysableSeq2seq(Seq2seq):
         analysableSeq2seq = AnalysableSeq2seq(encoder, decoder)
         analysableSeq2seq.load_state_dict(checkpoint.model.state_dict())
 
-        return analysableSeq2seq
+        model = analysableSeq2seq
+
+        model.flatten_parameters()  # make RNN parameters contiguous
+
+        return Checkpoint(model=model, input_vocab=checkpoint.input_vocab,
+                          output_vocab=checkpoint.output_vocab,
+                          optimizer=checkpoint.optimizer,
+                          epoch=checkpoint.epoch,
+                          step=checkpoint.step,
+                          path=path_to_checkpoint)
+
+
+#model = AnalysableSeq2seq.load('../../machine-zoo/guided/gru/1')
+#print(model)
