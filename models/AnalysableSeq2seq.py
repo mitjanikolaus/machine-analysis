@@ -1,23 +1,16 @@
-import os
-import dill
-from seq2seq.models import DecoderRNN
-from seq2seq.models import EncoderRNN
 from seq2seq.models import Seq2seq
 from seq2seq.models.attention import MLP, Dot, HardGuidance, Concat
 from seq2seq.util.checkpoint import Checkpoint
 from torch.nn import GRU, LSTM
 
-import torch.nn.functional as F
-
-
 from .HiddenStateAnalysisDecoderRNN import HiddenStateAnalysisDecoderRNN
+from .HiddenStateAnalysisEncoderRNN import HiddenStateAnalysisEncoderRNN
 
 class AnalysableSeq2seq(Seq2seq):
 
 
     @staticmethod
     def load(path_to_checkpoint: str):
-
 
         checkpoint = Checkpoint.load(path_to_checkpoint)
 
@@ -62,7 +55,7 @@ class AnalysableSeq2seq(Seq2seq):
             input_dropout_p=checkpoint.model.decoder.input_dropout_p,
             dropout_p=checkpoint.model.decoder.dropout_p,
         )
-        encoder = EncoderRNN(
+        encoder = HiddenStateAnalysisEncoderRNN(
             vocab_size=len(checkpoint.input_vocab),
             max_len=checkpoint.model.encoder.max_len,
             hidden_size=checkpoint.model.encoder.hidden_size,
@@ -89,6 +82,26 @@ class AnalysableSeq2seq(Seq2seq):
                           step=checkpoint.step,
                           path=path_to_checkpoint)
 
+    def forward(self, input_variable, input_lengths=None, target_variables=None,
+                teacher_forcing_ratio=0):
+        # Unpack target variables
+        try:
+            target_output = target_variables.get('decoder_output', None)
+            # The attention target is preprended with an extra SOS step. We must remove this
+            provided_attention = target_variables['attention_target'][:,1:] if 'attention_target' in target_variables else None
+        except AttributeError:
+            target_output = None
+            provided_attention = None
+
+
+        encoder_outputs, encoder_hidden, ret_dict_encoder = self.encoder(input_variable, input_lengths)
+        result = self.decoder(inputs=target_output,
+                              encoder_hidden=encoder_hidden,
+                              encoder_outputs=encoder_outputs,
+                              function=self.decode_function,
+                              teacher_forcing_ratio=teacher_forcing_ratio,
+                              provided_attention=provided_attention)
+        return result + (ret_dict_encoder,)
 
 #model = AnalysableSeq2seq.load('../../machine-zoo/guided/gru/1')
 #print(model)

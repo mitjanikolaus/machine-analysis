@@ -10,6 +10,7 @@ from seq2seq.trainer import SupervisedTrainer
 
 from models.AnalysableSeq2seq import AnalysableSeq2seq
 from models.HiddenStateAnalysisDecoderRNN import HiddenStateAnalysisDecoderRNN
+from models.HiddenStateAnalysisEncoderRNN import HiddenStateAnalysisEncoderRNN
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -121,13 +122,15 @@ def run_model_on_test_data(model, data, get_batch_data):
             for batch in batch_iterator:
                 input_variable, input_lengths, target_variable = get_batch_data(batch)
 
-                ##TODO define own forward path to get hidden states for all timesteps
-
-                decoder_outputs, decoder_hidden, ret_dict = model(input_variable, input_lengths.tolist(), target_variable)
+                # using own forward path to get hidden states for all timesteps
+                decoder_outputs, decoder_hidden, ret_dict_decder, ret_dict_encoder = model(input_variable, input_lengths.tolist(), target_variable)
 
                 print('\n\n\n')
-                print(ret_dict[HiddenStateAnalysisDecoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS])
-                print(len(ret_dict[HiddenStateAnalysisDecoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS]))
+                print('Hidden activations of encoder: ',
+                      ret_dict_encoder[HiddenStateAnalysisEncoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS])
+
+                print('\n\n\n')
+                print('Hidden activations of decoder: ',ret_dict_decder[HiddenStateAnalysisDecoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS])
 
                 return
 

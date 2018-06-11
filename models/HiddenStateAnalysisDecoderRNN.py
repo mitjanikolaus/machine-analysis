@@ -1,8 +1,6 @@
 import random
 import numpy as np
 
-import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
 from seq2seq.models import DecoderRNN
@@ -10,7 +8,7 @@ from seq2seq.models.attention import HardGuidance
 
 class HiddenStateAnalysisDecoderRNN(DecoderRNN):
 
-    KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS = 'hidden_activations'
+    KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS = 'hidden_activations_decoder'
 
     def forward(self, inputs=None, encoder_hidden=None, encoder_outputs=None,
                 function=F.log_softmax, teacher_forcing_ratio=0, provided_attention=None):
