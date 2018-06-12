@@ -5,10 +5,13 @@ import torch.nn.functional as F
 
 from seq2seq.models import DecoderRNN
 from seq2seq.models.attention import HardGuidance
+from torch import nn
+
 
 class HiddenStateAnalysisDecoderRNN(DecoderRNN):
 
     KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS = 'hidden_activations_decoder'
+    KEY_CELL_ACTIVATIONS_ALL_TIMESTEPS = 'cell_activations_encoder'
 
     def forward(self, inputs=None, encoder_hidden=None, encoder_outputs=None,
                 function=F.log_softmax, teacher_forcing_ratio=0, provided_attention=None):
@@ -20,7 +23,9 @@ class HiddenStateAnalysisDecoderRNN(DecoderRNN):
         inputs, batch_size, max_length = self._validate_args(inputs, encoder_hidden, encoder_outputs,
                                                              function, teacher_forcing_ratio)
 
-        decoder_hidden = self._init_state(encoder_hidden)
+        decoder_hidden_states = self._init_state(encoder_hidden)
+        if self.rnn_cell == nn.LSTM:
+            decoder_cell_states = self._init_state(encoder_hidden)
 
         use_teacher_forcing = True if random.random() < teacher_forcing_ratio else False
 
@@ -28,6 +33,7 @@ class HiddenStateAnalysisDecoderRNN(DecoderRNN):
         sequence_symbols = []
         lengths = np.array([max_length] * batch_size)
         hidden_activations_all_timesteps = []
+        cell_activations_all_timesteps = []
 
         def decode(step, step_output, step_attn):
             decoder_outputs.append(step_output)
@@ -62,11 +68,23 @@ class HiddenStateAnalysisDecoderRNN(DecoderRNN):
             # Perform one forward step
             if self.attention and isinstance(self.attention.method, HardGuidance):
                 attention_method_kwargs['step'] = di
-            decoder_output, decoder_hidden, step_attn = self.forward_step(decoder_input, decoder_hidden,
+
+            if self.rnn_cell == nn.LSTM:
+                decoder_output, (decoder_hidden_states, decoder_cell_states), step_attn = self.forward_step(decoder_input,
+                                                                                     (decoder_hidden_states, decoder_cell_states),
+                                                                                     encoder_outputs,
+                                                                                     function=function,
+                                                                                     **attention_method_kwargs)
+                cell_activations_all_timesteps.append(decoder_cell_states)
+
+            else:
+                decoder_output, decoder_hidden_states, step_attn = self.forward_step(decoder_input, decoder_hidden_states,
                                                                           encoder_outputs,
                                                                           function=function,
                                                                           **attention_method_kwargs)
-            hidden_activations_all_timesteps.append(decoder_hidden)
+
+
+            hidden_activations_all_timesteps.append(decoder_hidden_states)
 
             # Remove the unnecessary dimension.
             step_output = decoder_output.squeeze(1)
@@ -78,5 +96,6 @@ class HiddenStateAnalysisDecoderRNN(DecoderRNN):
         ret_dict[DecoderRNN.KEY_SEQUENCE] = sequence_symbols
         ret_dict[DecoderRNN.KEY_LENGTH] = lengths.tolist()
         ret_dict[HiddenStateAnalysisDecoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS] = hidden_activations_all_timesteps
+        ret_dict[HiddenStateAnalysisDecoderRNN.KEY_CELL_ACTIVATIONS_ALL_TIMESTEPS] = cell_activations_all_timesteps
 
-        return decoder_outputs, decoder_hidden, ret_dict
+        return decoder_outputs, decoder_hidden_states, ret_dict
