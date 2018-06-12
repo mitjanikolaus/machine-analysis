@@ -3,6 +3,7 @@ import torch.nn as nn
 
 from seq2seq.models import EncoderRNN
 from torch.autograd import Variable
+from models.lstm import CustomLSTM
 
 class HiddenStateAnalysisEncoderRNN(EncoderRNN):
 
@@ -21,6 +22,10 @@ class HiddenStateAnalysisEncoderRNN(EncoderRNN):
         #TODO better init?
         self.num_directions = 1
         hidden = Variable(torch.zeros(self.num_directions, batch_size, self.hidden_size))
+
+        # TODO: Refactor
+        if self.rnn_cell == CustomLSTM:
+            hidden = (hidden, hidden)
 
         hidden_activations_all_timesteps = []
 

@@ -122,15 +122,18 @@ def run_model_on_test_data(model, data, get_batch_data):
             for batch in batch_iterator:
                 input_variable, input_lengths, target_variable = get_batch_data(batch)
 
+
                 # using own forward path to get hidden states for all timesteps
                 decoder_outputs, decoder_hidden, ret_dict_decder, ret_dict_encoder = model(input_variable, input_lengths.tolist(), target_variable)
 
-                print('\n\n\n')
-                print('Hidden activations of encoder: ',
-                      ret_dict_encoder[HiddenStateAnalysisEncoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS])
+                print(model.encoder.rnn.gates)
 
-                print('\n\n\n')
-                print('Hidden activations of decoder: ',ret_dict_decder[HiddenStateAnalysisDecoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS])
+                # print('\n\n\n')
+                # print('Hidden activations of encoder: ',
+                #       ret_dict_encoder[HiddenStateAnalysisEncoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS])
+                #
+                # print('\n\n\n')
+                # print('Hidden activations of decoder: ',ret_dict_decder[HiddenStateAnalysisDecoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS])
 
                 return
 

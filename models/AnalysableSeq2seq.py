@@ -5,6 +5,8 @@ from torch.nn import GRU, LSTM
 
 from .HiddenStateAnalysisDecoderRNN import HiddenStateAnalysisDecoderRNN
 from .HiddenStateAnalysisEncoderRNN import HiddenStateAnalysisEncoderRNN
+from .analysable_cell import AnalysableGRUCell, AnalysableLSTMCell
+from models.lstm import CustomLSTM
 
 class AnalysableSeq2seq(Seq2seq):
 
@@ -73,6 +75,9 @@ class AnalysableSeq2seq(Seq2seq):
 
         model = analysableSeq2seq
 
+        #model.encoder = replace_with_analysable_gates(model.encoder)
+        #model.decoder = replace_with_analysable_gates(model.decoder)
+
         model.flatten_parameters()  # make RNN parameters contiguous
 
         return Checkpoint(model=model, input_vocab=checkpoint.input_vocab,
@@ -102,6 +107,13 @@ class AnalysableSeq2seq(Seq2seq):
                               teacher_forcing_ratio=teacher_forcing_ratio,
                               provided_attention=provided_attention)
         return result + (ret_dict_encoder,)
+
+
+def replace_with_analysable_gates(model):
+    if model.rnn_cell == LSTM:
+        model.rnn = CustomLSTM(model.rnn.input_size, model.rnn.hidden_size, model.rnn.num_layers, model.rnn.batch_first)
+        model.rnn_cell = CustomLSTM
+    return model
 
 #model = AnalysableSeq2seq.load('../../machine-zoo/guided/gru/1')
 #print(model)

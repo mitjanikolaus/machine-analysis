@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from seq2seq.models import DecoderRNN
 from seq2seq.models.attention import HardGuidance
 
+
 class HiddenStateAnalysisDecoderRNN(DecoderRNN):
 
     KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS = 'hidden_activations_decoder'
