@@ -94,41 +94,16 @@ def run_model_on_test_data(model, data, get_batch_data):
             for batch in batch_iterator:
                 input_variable, input_lengths, target_variable = get_batch_data(batch)
 
-                # using own forward path to get hidden states for all timesteps
+                # using own forward pass to get hidden states for all timesteps
                 decoder_outputs, decoder_hidden, ret_dict_decoder, ret_dict_encoder = model(input_variable, input_lengths.tolist(), target_variable)
-
-                print('\n\n\n')
-                print('decoder_outputs: ', decoder_outputs)
 
                 hidden_activations_encoder = ret_dict_encoder[HiddenStateAnalysisEncoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS]
                 hidden_activations_decoder = ret_dict_decoder[HiddenStateAnalysisDecoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS]
-                print('\n\n\n')
-                print('Hidden activations of encoder: ', hidden_activations_encoder)
-
-                print('\n\n\n')
-                print('Hidden activations of decoder: ',ret_dict_decoder[HiddenStateAnalysisDecoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS])
 
                 all_input_seqs.append(input_variable)
                 all_encoder_activations.append(hidden_activations_encoder)
                 all_decoder_activations.append(hidden_activations_decoder)
                 all_model_outputs.append(all_decoder_activations)
-
-                import matplotlib.pyplot as plt
-                import numpy as np
-
-
-                #for ts in range(len(hidden_activations_encoder)):
-                #    hidden_activations_encoder[ts] = hidden_activations_encoder[ts].numpy()
-
-                #hidden_activations_encoder = np.array(hidden_activations_encoder).reshape(4, 512)
-
-                #plot first 100 hidden activations
-                #hidden_activations_encoder = hidden_activations_encoder[:,0:100]
-
-                #plt.imshow(hidden_activations_encoder, cmap='hot', interpolation='nearest')
-                #plt.show()
-
-                #return
 
         dataset = ActivationsDataset(
             all_input_seqs, all_model_outputs,
