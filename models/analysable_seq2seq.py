@@ -3,8 +3,8 @@ from seq2seq.models.attention import MLP, Dot, HardGuidance, Concat
 from seq2seq.util.checkpoint import Checkpoint
 from torch.nn import GRU, LSTM
 
-from .HiddenStateAnalysisDecoderRNN import HiddenStateAnalysisDecoderRNN
-from .HiddenStateAnalysisEncoderRNN import HiddenStateAnalysisEncoderRNN
+from .analysable_decoder import HiddenStateAnalysisDecoderRNN
+from .analysable_encoder import HiddenStateAnalysisEncoderRNN
 
 class AnalysableSeq2seq(Seq2seq):
 

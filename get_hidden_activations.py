@@ -1,15 +1,22 @@
+"""
+Define a function to retrieve a wide variety of activations for later analysis.
+"""
+
+# STD
 import logging
 import os
+from collections import defaultdict
 
+# EXT
 import torch
 import torchtext
-
 from seq2seq.dataset import SourceField, TargetField, AttentionField
 from seq2seq.trainer import SupervisedTrainer
 
-from models.AnalysableSeq2seq import AnalysableSeq2seq
-from models.HiddenStateAnalysisDecoderRNN import HiddenStateAnalysisDecoderRNN
-from models.HiddenStateAnalysisEncoderRNN import HiddenStateAnalysisEncoderRNN
+# PROJECT
+from models.analysable_seq2seq import AnalysableSeq2seq
+from models.analysable_decoder import HiddenStateAnalysisDecoderRNN
+from models.analysable_encoder import HiddenStateAnalysisEncoderRNN
 from activations import ActivationsDataset
 
 
@@ -78,8 +85,7 @@ def run_and_get_hidden_activations(checkpoint_path, test_data_path, attention_me
 def run_model_on_test_data(model, data, get_batch_data):
         # Store activations and inputs for later
         all_input_seqs = []
-        all_encoder_activations = []
-        all_decoder_activations = []
+        all_model_activations = defaultdict(list)
         all_model_outputs = []
 
         # create batch iterator
@@ -95,51 +101,23 @@ def run_model_on_test_data(model, data, get_batch_data):
                 input_variable, input_lengths, target_variable = get_batch_data(batch)
 
                 # using own forward path to get hidden states for all timesteps
-                decoder_outputs, decoder_hidden, ret_dict_decoder, ret_dict_encoder = model(input_variable, input_lengths.tolist(), target_variable)
+                decoder_outputs, decoder_hidden, ret_dict_decoder, ret_dict_encoder = model(
+                    input_variable, input_lengths.tolist(), target_variable
+                )
+                current_sample_model_activations = dict(ret_dict_encoder)
+                current_sample_model_activations.update(ret_dict_decoder)
 
-                print('\n\n\n')
-                print('decoder_outputs: ', decoder_outputs)
+                # Store activations
+                for activations_name, activations in current_sample_model_activations.items():
+                    if "activations" in activations_name:
+                        all_model_activations[activations_name].append(activations)
 
-                hidden_activations_encoder = ret_dict_encoder[HiddenStateAnalysisEncoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS]
-                hidden_activations_decoder = ret_dict_decoder[HiddenStateAnalysisDecoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS]
-                print('\n\n\n')
-                print('Hidden activations of encoder: ', hidden_activations_encoder)
-
-                print('\n\n\n')
-                print('Hidden activations of decoder: ',ret_dict_decoder[HiddenStateAnalysisDecoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS])
-
-                all_input_seqs.append(input_variable)
-                all_encoder_activations.append(hidden_activations_encoder)
-                all_decoder_activations.append(hidden_activations_decoder)
-                all_model_outputs.append(all_decoder_activations)
-
-                import matplotlib.pyplot as plt
-                import numpy as np
-
-
-                #for ts in range(len(hidden_activations_encoder)):
-                #    hidden_activations_encoder[ts] = hidden_activations_encoder[ts].numpy()
-
-                #hidden_activations_encoder = np.array(hidden_activations_encoder).reshape(4, 512)
-
-                #plot first 100 hidden activations
-                #hidden_activations_encoder = hidden_activations_encoder[:,0:100]
-
-                #plt.imshow(hidden_activations_encoder, cmap='hot', interpolation='nearest')
-                #plt.show()
-
-                #return
-
-        dataset = ActivationsDataset(
-            all_input_seqs, all_model_outputs,
-            encoder_activations=all_encoder_activations,
-            decoder_activations=all_decoder_activations
-        )
+        dataset = ActivationsDataset(all_input_seqs, all_model_outputs, **all_model_activations)
 
         return dataset
 
 
-checkpoint_path='../machine-zoo/guided/gru/1/'
+checkpoint_path='../machine-zoo/guided/lstm/1/'
 test_data='../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/heldout_tables.tsv'
 
 run_and_get_hidden_activations(
