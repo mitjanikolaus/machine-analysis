@@ -10,6 +10,8 @@ from seq2seq.trainer import SupervisedTrainer
 from models.AnalysableSeq2seq import AnalysableSeq2seq
 from models.HiddenStateAnalysisDecoderRNN import HiddenStateAnalysisDecoderRNN
 from models.HiddenStateAnalysisEncoderRNN import HiddenStateAnalysisEncoderRNN
+from activations import ActivationsDataset
+
 
 def run_and_get_hidden_activations(checkpoint_path, test_data_path, attention_method, use_attention_loss, ignore_output_eos, max_len=50):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -70,6 +72,11 @@ def run_and_get_hidden_activations(checkpoint_path, test_data_path, attention_me
 
 
 def run_model_on_test_data(model, data, get_batch_data):
+        # Store activations and inputs for later
+        all_input_seqs = []
+        all_encoder_activations = []
+        all_decoder_activations = []
+
         # create batch iterator
         iterator_device = torch.cuda.current_device() if torch.cuda.is_available() else -1
         batch_iterator = torchtext.data.BucketIterator(
@@ -89,11 +96,16 @@ def run_model_on_test_data(model, data, get_batch_data):
                 print('decoder_outputs: ',decoder_outputs)
 
                 hidden_activations_encoder = ret_dict_encoder[HiddenStateAnalysisEncoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS]
+                hidden_activations_decoder = ret_dict_decoder[HiddenStateAnalysisDecoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS]
                 print('\n\n\n')
                 print('Hidden activations of encoder: ', hidden_activations_encoder)
 
                 print('\n\n\n')
                 print('Hidden activations of decoder: ',ret_dict_decoder[HiddenStateAnalysisDecoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS])
+
+                all_input_seqs.append(input_variable)
+                all_encoder_activations.append(hidden_activations_encoder)
+                all_decoder_activations.append(hidden_activations_decoder)
 
                 import matplotlib.pyplot as plt
                 import numpy as np
@@ -111,6 +123,16 @@ def run_model_on_test_data(model, data, get_batch_data):
                 plt.show()
 
                 return
+
+        dataset = ActivationsDataset(
+            all_input_seqs,
+            encoder_activations=all_encoder_activations,
+            decoder_activations=all_decoder_activations
+        )
+        dataset.save("test_activations.data")
+        #del dataset
+        #dataset = ActivationsDataset.load("test_activations.data")
+
         return
 
 
