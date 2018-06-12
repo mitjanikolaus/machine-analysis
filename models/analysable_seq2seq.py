@@ -93,7 +93,6 @@ class AnalysableSeq2seq(Seq2seq):
             target_output = None
             provided_attention = None
 
-
         encoder_outputs, encoder_hidden, ret_dict_encoder = self.encoder(input_variable, input_lengths)
         result = self.decoder(inputs=target_output,
                               encoder_hidden=encoder_hidden,
@@ -102,6 +101,3 @@ class AnalysableSeq2seq(Seq2seq):
                               teacher_forcing_ratio=teacher_forcing_ratio,
                               provided_attention=provided_attention)
         return result + (ret_dict_encoder,)
-
-#model = AnalysableSeq2seq.load('../../machine-zoo/guided/gru/1')
-#print(model)

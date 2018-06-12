@@ -15,8 +15,6 @@ from seq2seq.trainer import SupervisedTrainer
 
 # PROJECT
 from models.analysable_seq2seq import AnalysableSeq2seq
-from models.analysable_decoder import HiddenStateAnalysisDecoderRNN
-from models.analysable_encoder import HiddenStateAnalysisEncoderRNN
 from activations import ActivationsDataset
 
 
@@ -117,8 +115,8 @@ def run_model_on_test_data(model, data, get_batch_data):
         return dataset
 
 
-checkpoint_path='../machine-zoo/guided/lstm/1/'
-test_data='../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/heldout_tables.tsv'
+checkpoint_path = '../machine-zoo/guided/gru/1/'
+test_data = '../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/heldout_tables.tsv'
 
 run_and_get_hidden_activations(
     checkpoint_path, test_data, attention_method='mlp', use_attention_loss=True, ignore_output_eos=True,

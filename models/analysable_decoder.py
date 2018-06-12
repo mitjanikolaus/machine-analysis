@@ -2,6 +2,7 @@
 # STD
 import random
 import numpy as np
+from collections import defaultdict
 
 # EXT
 from torch import nn
@@ -10,14 +11,22 @@ import torch.nn.functional as F
 # PROJECT
 from seq2seq.models import DecoderRNN
 from seq2seq.models.attention import HardGuidance
+from models.analysable_cells import AnalysableLSTMCell, AnalysableGRUCell, AnalysableCellsMixin
 
 
-class HiddenStateAnalysisDecoderRNN(DecoderRNN):
+class HiddenStateAnalysisDecoderRNN(DecoderRNN, AnalysableCellsMixin)
     KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS = 'hidden_activations_decoder'
     KEY_CELL_ACTIVATIONS_ALL_TIMESTEPS = 'cell_activations_encoder'
 
+    def __init__(self, *args, **kwargs):
+        DecoderRNN.__init__(self, *args, **kwargs)
+        AnalysableCellsMixin.__init__(self, *args, **kwargs)
+
     def forward(self, inputs=None, encoder_hidden=None, encoder_outputs=None,
                 function=F.log_softmax, teacher_forcing_ratio=0, provided_attention=None):
+        hidden_activations_all_timesteps = []
+        cell_activations_all_timesteps = []
+        gate_activations_all_timesteps = defaultdict(list)
 
         ret_dict = dict()
         if self.use_attention:
@@ -30,13 +39,14 @@ class HiddenStateAnalysisDecoderRNN(DecoderRNN):
         if self.rnn_cell == nn.LSTM:
             decoder_cell_states = self._init_state(encoder_hidden)
 
+        # Replace cells once
+        self.replace_cells()
+
         use_teacher_forcing = True if random.random() < teacher_forcing_ratio else False
 
         decoder_outputs = []
         sequence_symbols = []
         lengths = np.array([max_length] * batch_size)
-        hidden_activations_all_timesteps = []
-        cell_activations_all_timesteps = []
 
         def decode(step, step_output, step_attn):
             decoder_outputs.append(step_output)

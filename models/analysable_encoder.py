@@ -9,10 +9,10 @@ from torch.autograd import Variable
 
 # PROJECT
 from seq2seq.models import EncoderRNN
-from models.analysable_cells import AnalysableLSTMCell
+from models.analysable_cells import AnalysableLSTMCell, AnalysableGRUCell, AnalysableCellsMixin
 
 
-class HiddenStateAnalysisEncoderRNN(EncoderRNN):
+class HiddenStateAnalysisEncoderRNN(EncoderRNN, AnalysableCellsMixin):
     """
     Modified version of the RNN Encoder which allows to store the networks activations for further analysis.
     """
@@ -20,8 +20,8 @@ class HiddenStateAnalysisEncoderRNN(EncoderRNN):
     KEY_CELL_ACTIVATIONS_ALL_TIMESTEPS = 'cell_activations_encoder'
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.cells_replaced = False
+        EncoderRNN.__init__(self, *args, **kwargs)
+        AnalysableCellsMixin.__init__(self, *args, **kwargs)
 
     def forward(self, input_var, input_lengths=None):
         return_dict = dict()
@@ -51,8 +51,7 @@ class HiddenStateAnalysisEncoderRNN(EncoderRNN):
             cell_states = Variable(torch.zeros(self.num_directions, batch_size, self.hidden_size))
             hidden = (hidden_states, cell_states)
 
-        elif self.rnn_cell == nn.GRU:
-            # TODO: Replace with Analyzable cell
+        elif self.rnn_cell == AnalysableGRUCell:
             hidden = hidden_states
 
         full_output = torch.zeros(batch_size, input_var.size()[1], self.hidden_size)
@@ -85,26 +84,3 @@ class HiddenStateAnalysisEncoderRNN(EncoderRNN):
             return_dict[gate_name + "_encoder"] = all_activations
 
         return full_output, hidden_states, return_dict
-
-    def replace_cells(self):
-        """
-        Replace the RNN cells with their analysable counterparts once during the first forward pass.
-        """
-        if not self.cells_replaced:
-            # Replace RNN cells with their analyzable counterparts which store activations
-            if self.rnn_cell == nn.LSTM:
-                self.rnn_cell = AnalysableLSTMCell
-
-                # Init new cell with trained weights
-                self.rnn = AnalysableLSTMCell(
-                    num_layers=self.rnn.num_layers, batch_first=self.rnn.batch_first,
-                    w_hh=self.rnn.weight_hh_l0, w_ih=self.rnn.weight_ih_l0, b_hh=self.rnn.bias_hh_l0,
-                    b_ih=self.rnn.bias_ih_l0
-                )
-
-            elif self.rnn_cell == nn.GRU:
-                # TODO: Replace with Analyzable cell
-                pass
-
-            self.cells_replaced = True
-
