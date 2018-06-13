@@ -83,7 +83,7 @@ def plot_activation_distributions(all_timesteps_activations: np.array, grid_size
     plt.show()
 
 
-def plot_activation_gradients(all_timesteps_activations: np.array, neuron_heatmap_size: tuple, show_title=True):
+def plot_activation_gradients(all_timesteps_activations: np.array, neuron_heatmap_size: tuple, show_title=True, absolute=True):
     num_timesteps = len(all_timesteps_activations)
 
     assert all([type(out) in (torch.Tensor, np.ndarray) for out in all_timesteps_activations]), \
@@ -99,7 +99,14 @@ def plot_activation_gradients(all_timesteps_activations: np.array, neuron_heatma
 
     for t, (axis, current_activations) in enumerate(zip(grid, all_timesteps_activations[1:])):
         activation_gradients = current_activations - last_activations
-        heatmap = axis.imshow(activation_gradients.reshape(*neuron_heatmap_size), cmap='coolwarm')
+        vmin, vmax = -2, 2
+        colormap = 'coolwarm'
+
+        if absolute:
+            vmin = 0
+            colormap = "Reds"
+
+        heatmap = axis.imshow(activation_gradients.reshape(*neuron_heatmap_size), cmap=colormap, vmin=vmin, vmax=vmax)
         axis.set_xlabel("t={} -> t={}".format(t, t+1))
         axis.set_xticks([])
         axis.set_yticks([])
@@ -115,7 +122,7 @@ def plot_activation_gradients(all_timesteps_activations: np.array, neuron_heatma
 
 
 if __name__ == "__main__":
-    test_data_path = './ga_gru_1_heldout_tables.pt'
+    test_data_path = './baseline_gru_1_heldout_tables.pt'
     data = ActivationsDataset.load(test_data_path, convert_to_numpy=True)
     target_activations = "hidden_activations_encoder"
 
@@ -131,4 +138,4 @@ if __name__ == "__main__":
 
     # Plot changes in activations values
     #plot_activation_gradients(sample, neuron_heatmap_size=(16, 32))
-    plot_activation_gradients(average, neuron_heatmap_size=(16, 32))
+    plot_activation_gradients(average, neuron_heatmap_size=(16, 32), show_title=False, absolute=True)
