@@ -6,6 +6,7 @@
 from torch.utils.data import Dataset
 from torch import Tensor
 import torch
+import numpy as np
 
 
 class ActivationsDataset(Dataset):
@@ -23,6 +24,9 @@ class ActivationsDataset(Dataset):
         self.model_inputs = model_inputs
         self.model_outputs = model_outputs
 
+        self.activation_columns = list(activations.keys())
+        self.columns = ["model_inputs", "model_outputs"] + self.activation_columns
+
         for name, activation_list in activations.items():
             setattr(self, name, activation_list)
 
@@ -39,6 +43,21 @@ class ActivationsDataset(Dataset):
         torch.save(self, save_path)
 
     @staticmethod
-    def load(load_path):
+    def load(load_path, convert_to_numpy=False):
         dataset = torch.load(load_path)
+
+        def _squeeze_out(array):
+            while len(array.shape) > 1:
+                array = array.squeeze(0)
+            return array
+
+        if convert_to_numpy:
+            for activation_column in dataset.columns:
+                activations = getattr(dataset, activation_column)
+                converted_activations = np.array([
+                    np.array([_squeeze_out(time_step.cpu().numpy()) for time_step in sample])
+                    for sample in activations
+                ])
+                setattr(dataset, activation_column, converted_activations)
+
         return dataset

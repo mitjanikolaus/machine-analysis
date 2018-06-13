@@ -31,19 +31,14 @@ def plot_hidden_activations(activations, input_length, num_units_to_plot=50):
     plt.show()
 
 
-def plot_activation_distributions(all_timesteps_activations: list, grid_size=None, show_title=True):
+def plot_activation_distributions(all_timesteps_activations: np.array, grid_size=None, show_title=True):
     num_timesteps = len(all_timesteps_activations)
 
-    assert all([type(out) == torch.Tensor for out in all_timesteps_activations]), \
+    assert all([type(out) in (torch.Tensor, np.ndarray) for out in all_timesteps_activations]), \
         "This function only takes all the activations for all the time steps of a single sample."
     if grid_size:
         assert grid_size[0] * grid_size[1] >= num_timesteps, \
             "Specified grid doesn't provide enough space for all plots."
-
-    def _squeeze_out(array):
-        while len(array.shape) > 1:
-            array = array.squeeze(0)
-        return array
 
     def _hex_to_RGB(hex):
         # Pass 16 to the integer function for change of base
@@ -75,8 +70,6 @@ def plot_activation_distributions(all_timesteps_activations: list, grid_size=Non
     colors = _color_gradient("#a8bee3", "#e58625", n=num_timesteps)
 
     for t, (axis, activations, color) in enumerate(zip(axes, all_timesteps_activations, colors)):
-        activations = activations.cpu().numpy()
-        activations = _squeeze_out(activations)
         num_bins = int(len(activations) / 4)
         axis.hist(activations, num_bins, density=True, facecolor=color, alpha=0.75)
         axis.set_xlabel("t={}".format(t))
@@ -90,13 +83,11 @@ def plot_activation_distributions(all_timesteps_activations: list, grid_size=Non
     plt.show()
 
 
-def plot_activation_gradients(all_timesteps_activations, neuron_heatmap_size, show_title=True):
+def plot_activation_gradients(all_timesteps_activations: np.array, neuron_heatmap_size: tuple, show_title=True):
     num_timesteps = len(all_timesteps_activations)
 
-    assert all([type(out) == torch.Tensor for out in all_timesteps_activations]), \
+    assert all([type(out) in (torch.Tensor, np.ndarray) for out in all_timesteps_activations]), \
         "This function only takes all the activations for all the time steps of a single sample."
-    assert neuron_heatmap_size[0] * neuron_heatmap_size[1] >= np.multiply.reduce(all_timesteps_activations[0].size()), \
-        "Specified grid doesn't provide enough space for all plots."
 
     fig = plt.figure()
     last_activations = all_timesteps_activations[0]
@@ -124,17 +115,20 @@ def plot_activation_gradients(all_timesteps_activations, neuron_heatmap_size, sh
 
 
 if __name__ == "__main__":
-    test_data_path = './test_activations_lstm_1_heldout_tables.pt'
-    data = ActivationsDataset.load(test_data_path)
+    test_data_path = './ga_gru_1_heldout_tables.pt'
+    data = ActivationsDataset.load(test_data_path, convert_to_numpy=True)
+    target_activations = "hidden_activations_encoder"
+
+    sample = getattr(data, target_activations)[12]  # Specific sample
+    average = np.array(getattr(data, target_activations)).mean(axis=0)
 
     # Plot activations as heat map
     #encoder_input_length = data.model_inputs[0].shape[1]-1
     #plot_hidden_activations(data.encoder_activations[0], encoder_input_length, num_units_to_plot=50)
 
-    SAMPLE = data.hidden_activations_encoder[12]
-
     # Plot distribution of activation values in a series of time steps
     #plot_activation_distributions(SAMPLE)
 
     # Plot changes in activations values
-    plot_activation_gradients(SAMPLE, neuron_heatmap_size=(16, 32))
+    #plot_activation_gradients(sample, neuron_heatmap_size=(16, 32))
+    plot_activation_gradients(average, neuron_heatmap_size=(16, 32))
