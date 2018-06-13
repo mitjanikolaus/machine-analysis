@@ -4,11 +4,47 @@ Define different utility functions, e.g. for different kinds of visualization.
 
 # EXT
 import torch
+import torchtext
+
 import matplotlib.pyplot as plt
 import numpy as np
 
+from seq2seq.dataset import SourceField, TargetField, AttentionField
+
+
 # PROJECT
 from activations import ActivationsDataset
+
+
+def load_test_data(test_data_path, input_vocab, output_vocab, ignore_output_eos, use_attention_loss, attention_method, max_len):
+    IGNORE_INDEX = -1
+    output_eos_used = not ignore_output_eos
+
+    src = SourceField()
+    tgt = TargetField(output_eos_used)
+
+    tabular_data_fields = [('src', src), ('tgt', tgt)]
+
+    if use_attention_loss or attention_method == 'hard':
+        attn = AttentionField(use_vocab=False, ignore_index=IGNORE_INDEX)
+        tabular_data_fields.append(('attn', attn))
+
+    src.vocab = input_vocab
+    tgt.vocab = output_vocab
+    tgt.eos_id = tgt.vocab.stoi[tgt.SYM_EOS]
+    tgt.sos_id = tgt.vocab.stoi[tgt.SYM_SOS]
+
+    def len_filter(example):
+        return len(example.src) <= max_len and len(example.tgt) <= max_len
+
+    # generate test set
+    test_set = torchtext.data.TabularDataset(
+        path=test_data_path, format='tsv',
+        fields=tabular_data_fields,
+        filter_pred=len_filter
+    )
+
+    return test_set
 
 
 def plot_hidden_activations(activations, num_units_to_plot=50):
