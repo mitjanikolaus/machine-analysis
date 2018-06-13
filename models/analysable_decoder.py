@@ -14,9 +14,9 @@ from seq2seq.models.attention import HardGuidance
 from models.analysable_cells import AnalysableLSTMCell, AnalysableGRUCell, AnalysableCellsMixin
 
 
-class HiddenStateAnalysisDecoderRNN(DecoderRNN, AnalysableCellsMixin)
+class HiddenStateAnalysisDecoderRNN(DecoderRNN, AnalysableCellsMixin):
     KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS = 'hidden_activations_decoder'
-    KEY_CELL_ACTIVATIONS_ALL_TIMESTEPS = 'cell_activations_encoder'
+    KEY_CELL_ACTIVATIONS_ALL_TIMESTEPS = 'cell_activations_decoder'
 
     def __init__(self, *args, **kwargs):
         DecoderRNN.__init__(self, *args, **kwargs)
@@ -28,19 +28,21 @@ class HiddenStateAnalysisDecoderRNN(DecoderRNN, AnalysableCellsMixin)
         cell_activations_all_timesteps = []
         gate_activations_all_timesteps = defaultdict(list)
 
-        ret_dict = dict()
+        return_dict = dict()
         if self.use_attention:
-            ret_dict[DecoderRNN.KEY_ATTN_SCORE] = list()
+            return_dict[DecoderRNN.KEY_ATTN_SCORE] = list()
 
         inputs, batch_size, max_length = self._validate_args(inputs, encoder_hidden, encoder_outputs,
                                                              function, teacher_forcing_ratio)
 
-        decoder_hidden_states = self._init_state(encoder_hidden)
-        if self.rnn_cell == nn.LSTM:
-            decoder_cell_states = self._init_state(encoder_hidden)
-
         # Replace cells once
-        self.replace_cells()
+        # Because we don't modify the original decoder's code, save the gate activations of the current time step inside
+        # the object instead of returning them
+        self.replace_cells(save_dont_return=True)
+
+        decoder_hidden_states = self._init_state(encoder_hidden)
+        if self.rnn_cell == AnalysableLSTMCell:
+            decoder_cell_states = self._init_state(encoder_hidden)
 
         use_teacher_forcing = True if random.random() < teacher_forcing_ratio else False
 
@@ -51,7 +53,7 @@ class HiddenStateAnalysisDecoderRNN(DecoderRNN, AnalysableCellsMixin)
         def decode(step, step_output, step_attn):
             decoder_outputs.append(step_output)
             if self.use_attention:
-                ret_dict[DecoderRNN.KEY_ATTN_SCORE].append(step_attn)
+                return_dict[DecoderRNN.KEY_ATTN_SCORE].append(step_attn)
             symbols = decoder_outputs[-1].topk(1)[1]
             sequence_symbols.append(symbols)
 
@@ -82,17 +84,22 @@ class HiddenStateAnalysisDecoderRNN(DecoderRNN, AnalysableCellsMixin)
             if self.attention and isinstance(self.attention.method, HardGuidance):
                 attention_method_kwargs['step'] = di
 
-            if self.rnn_cell == nn.LSTM:
+            if self.rnn_cell == AnalysableLSTMCell:
                 decoder_output, (decoder_hidden_states, decoder_cell_states), step_attn = self.forward_step(
                     decoder_input, (decoder_hidden_states, decoder_cell_states), encoder_outputs,
                     function=function, **attention_method_kwargs
                 )
-                cell_activations_all_timesteps.append(decoder_cell_states)
 
+                cell_activations_all_timesteps.append(decoder_cell_states)
             else:
                 decoder_output, decoder_hidden_states, step_attn = self.forward_step(
                     decoder_input, decoder_hidden_states, encoder_outputs, function=function, **attention_method_kwargs
                 )
+
+            if self.rnn_cell in (AnalysableLSTMCell, AnalysableGRUCell):
+                gates = self.rnn.gates
+                for gate_name, activations in gates.items():
+                    gate_activations_all_timesteps[gate_name].append(activations)
 
             hidden_activations_all_timesteps.append(decoder_hidden_states)
 
@@ -101,9 +108,14 @@ class HiddenStateAnalysisDecoderRNN(DecoderRNN, AnalysableCellsMixin)
             # Get the actual symbol
             symbols = decode(di, step_output, step_attn)
 
-        ret_dict[DecoderRNN.KEY_SEQUENCE] = sequence_symbols
-        ret_dict[DecoderRNN.KEY_LENGTH] = lengths.tolist()
-        ret_dict[HiddenStateAnalysisDecoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS] = hidden_activations_all_timesteps
-        ret_dict[HiddenStateAnalysisDecoderRNN.KEY_CELL_ACTIVATIONS_ALL_TIMESTEPS] = cell_activations_all_timesteps
+        return_dict[DecoderRNN.KEY_SEQUENCE] = sequence_symbols
+        return_dict[DecoderRNN.KEY_LENGTH] = lengths.tolist()
+        return_dict[HiddenStateAnalysisDecoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS] = hidden_activations_all_timesteps
 
-        return decoder_outputs, decoder_hidden_states, ret_dict
+        if self.rnn_cell == AnalysableLSTMCell:
+            return_dict[HiddenStateAnalysisDecoderRNN.KEY_CELL_ACTIVATIONS_ALL_TIMESTEPS] = cell_activations_all_timesteps
+
+        for gate_name, all_activations in gate_activations_all_timesteps.items():
+            return_dict[gate_name + "_decoder"] = all_activations
+
+        return decoder_outputs, decoder_hidden_states, return_dict

@@ -59,15 +59,11 @@ class HiddenStateAnalysisEncoderRNN(EncoderRNN, AnalysableCellsMixin):
         for i in range(0, embedded.shape[1]):
             input = embedded[:, i, :].view(1, 1, -1)  # shape of input: seq_len, batch, input_size)
 
-            hidden, gates = self.rnn(input, hidden)
+            output, hidden, gates = self.rnn(input, hidden)
 
             # LSTM case
-            if isinstance(hidden, tuple):
-                output = hidden[0][self.rnn.num_layers - 1].clone().unsqueeze(0)
+            if self.rnn_cell == AnalysableLSTMCell:
                 cell_activations_all_timesteps.append(hidden[1])
-            # GRU / vanilla RNN case
-            else:
-                output = hidden[self.rnn.num_layers - 1].clone().unsqueeze(0)
 
             full_output[:, i, :] = output
             hidden_activations_all_timesteps.append(hidden_states)
@@ -77,7 +73,7 @@ class HiddenStateAnalysisEncoderRNN(EncoderRNN, AnalysableCellsMixin):
 
         return_dict[HiddenStateAnalysisEncoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS] = hidden_activations_all_timesteps
 
-        if self.rnn_cell == nn.LSTM:
+        if self.rnn_cell == AnalysableLSTMCell:
             return_dict[HiddenStateAnalysisEncoderRNN.KEY_CELL_ACTIVATIONS_ALL_TIMESTEPS] = cell_activations_all_timesteps
 
         for gate_name, all_activations in gate_activations_all_timesteps.items():

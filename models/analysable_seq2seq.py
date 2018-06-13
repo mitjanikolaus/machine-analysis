@@ -1,13 +1,19 @@
+"""
+Define a subclass of the Seq2Seq model which allows to store and analyze its activations.
+"""
+
+# EXT
 from seq2seq.models import Seq2seq
 from seq2seq.models.attention import MLP, Dot, HardGuidance, Concat
 from seq2seq.util.checkpoint import Checkpoint
 from torch.nn import GRU, LSTM
 
+# PROJECT
 from .analysable_decoder import HiddenStateAnalysisDecoderRNN
 from .analysable_encoder import HiddenStateAnalysisEncoderRNN
 
-class AnalysableSeq2seq(Seq2seq):
 
+class AnalysableSeq2seq(Seq2seq):
 
     @staticmethod
     def load(path_to_checkpoint: str):

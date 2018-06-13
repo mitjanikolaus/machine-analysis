@@ -82,7 +82,7 @@ def run_and_get_hidden_activations(checkpoint_path, test_data_path, attention_me
 
 def run_model_on_test_data(model, data, get_batch_data):
         # Store activations and inputs for later
-        all_input_seqs = []
+        all_model_inputs = []
         all_model_activations = defaultdict(list)
         all_model_outputs = []
 
@@ -99,23 +99,27 @@ def run_model_on_test_data(model, data, get_batch_data):
                 input_variable, input_lengths, target_variable = get_batch_data(batch)
 
                 # using own forward path to get hidden states for all timesteps
-                decoder_outputs, decoder_hidden, ret_dict_decoder, ret_dict_encoder = model(
+                decoder_outputs, decoder_hidden, return_dict_decoder, return_dict_encoder = model(
                     input_variable, input_lengths.tolist(), target_variable
                 )
-                current_sample_model_activations = dict(ret_dict_encoder)
-                current_sample_model_activations.update(ret_dict_decoder)
+                current_sample_model_activations = dict(return_dict_encoder)
+                current_sample_model_activations.update(return_dict_decoder)
 
                 # Store activations
                 for activations_name, activations in current_sample_model_activations.items():
                     if "activations" in activations_name:
                         all_model_activations[activations_name].append(activations)
 
-        dataset = ActivationsDataset(all_input_seqs, all_model_outputs, **all_model_activations)
+                # Store inputs and outputs
+                all_model_inputs.append(input_variable)
+                all_model_outputs.append(decoder_outputs)
+
+        dataset = ActivationsDataset(all_model_inputs, all_model_outputs, **all_model_activations)
 
         return dataset
 
 
-checkpoint_path = '../machine-zoo/guided/gru/1/'
+checkpoint_path = '../machine-zoo/guided/lstm/1/'
 test_data = '../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/heldout_tables.tsv'
 
 run_and_get_hidden_activations(
