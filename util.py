@@ -11,19 +11,22 @@ import numpy as np
 from activations import ActivationsDataset
 
 
-def plot_hidden_activations(activations, input_length, num_units_to_plot=50):
+def plot_hidden_activations(activations, num_units_to_plot=50):
     """
     Plot hidden activations for 1 sample
     """
+
+    num_timesteps = len(activations)
+
     for ts in range(len(activations)):
         activations[ts] = activations[ts].numpy()
 
-    activations = np.array(activations).reshape(-1, input_length)
+    activations = np.array(activations).reshape(-1, num_timesteps)
 
     activations = activations[np.random.choice(activations.shape[0], num_units_to_plot),:]
 
     heatmap = plt.imshow(activations, cmap='hot', interpolation='nearest')
-    plt.xticks(np.arange(0, input_length, step=1))
+    plt.xticks(np.arange(0, num_timesteps, step=1))
     plt.xlabel('timestep')
     plt.ylabel('hidden unit')
     plt.colorbar(heatmap)
@@ -93,8 +96,7 @@ if __name__ == "__main__":
     data = ActivationsDataset.load(test_data_path)
 
     # Plot activations as heat map
-    #encoder_input_length = data.model_inputs[0].shape[1]-1
-    #plot_hidden_activations(data.encoder_activations[0], encoder_input_length, num_units_to_plot=50)
+    plot_hidden_activations(data.hidden_activations_decoder[0], num_units_to_plot=50)
 
     # Plot distribution of activation values in a series of time steps
-    plot_activation_distributions(data.hidden_activations_encoder[12])
+    plot_activation_distributions(data.hidden_activations_decoder[12])
