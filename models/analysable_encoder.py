@@ -64,9 +64,12 @@ class HiddenStateAnalysisEncoderRNN(EncoderRNN, AnalysableCellsMixin):
             # LSTM case
             if self.rnn_cell == AnalysableLSTMCell:
                 cell_activations_all_timesteps.append(hidden[1])
+                hidden_activations_all_timesteps.append(hidden[0])
+            # GRU case
+            else:
+                hidden_activations_all_timesteps.append(hidden)
 
             full_output[:, i, :] = output
-            hidden_activations_all_timesteps.append(hidden_states)
 
             for gate_name, activations in gates.items():
                 gate_activations_all_timesteps[gate_name].append(activations)
