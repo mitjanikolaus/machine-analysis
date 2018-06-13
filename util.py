@@ -89,7 +89,7 @@ def plot_activation_distributions(all_timesteps_activations: list, grid_size=Non
 
 
 if __name__ == "__main__":
-    test_data_path = './test_activations_lstm_1_heldout_tables.pt'
+    test_data_path = './test_activations_gru_1_heldout_tables.pt'
     data = ActivationsDataset.load(test_data_path)
 
     # Plot activations as heat map

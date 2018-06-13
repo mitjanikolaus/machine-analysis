@@ -23,8 +23,6 @@ class ActivationsDataset(Dataset):
         self.model_inputs = model_inputs
         self.model_outputs = model_outputs
 
-        self.columns = ["Inputs", "Outputs"] + list(activations.keys())  # Names of columns in data set
-
         for name, activation_list in activations.items():
             setattr(self, name, activation_list)
 
