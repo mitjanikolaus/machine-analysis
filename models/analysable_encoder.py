@@ -33,7 +33,7 @@ class HiddenStateAnalysisEncoderRNN(EncoderRNN, AnalysableCellsMixin):
         embedded = self.input_dropout(embedded)
 
         # Replace cells once
-        self.replace_cells()
+        self.replace_cells(save_dont_return=True)
 
         # TODO allow larger batches
         if not input_var.size()[0] == 1: raise ValueError('Batch size must be 1')
@@ -49,30 +49,24 @@ class HiddenStateAnalysisEncoderRNN(EncoderRNN, AnalysableCellsMixin):
         # Replace RNN cells with their analyzable counterparts which store activations
         if self.rnn_cell == AnalysableLSTMCell:
             cell_states = Variable(torch.zeros(self.num_directions, batch_size, self.hidden_size))
-            hidden = (hidden_states, cell_states)
-
-        elif self.rnn_cell == AnalysableGRUCell:
-            hidden = hidden_states
-
         full_output = torch.zeros(batch_size, input_var.size()[1], self.hidden_size)
 
         for i in range(0, embedded.shape[1]):
             input = embedded[:, i, :].view(1, 1, -1)  # shape of input: seq_len, batch, input_size)
 
-            output, hidden, gates = self.rnn(input, hidden)
-
-            # LSTM case
             if self.rnn_cell == AnalysableLSTMCell:
-                cell_activations_all_timesteps.append(hidden[1])
-                hidden_activations_all_timesteps.append(hidden[0])
-            # GRU case
+                output, (hidden_states, cell_states) = self.rnn(input, (hidden_states, cell_states))
+                cell_activations_all_timesteps.append(cell_states)
             else:
-                hidden_activations_all_timesteps.append(hidden)
+                output, hidden_states = self.rnn(input, hidden_states)
 
             full_output[:, i, :] = output
+            hidden_activations_all_timesteps.append(hidden_states)
 
-            for gate_name, activations in gates.items():
-                gate_activations_all_timesteps[gate_name].append(activations)
+            if self.rnn_cell in (AnalysableLSTMCell, AnalysableGRUCell):
+                gates = self.rnn.gates
+                for gate_name, activations in gates.items():
+                    gate_activations_all_timesteps[gate_name].append(activations)
 
         return_dict[HiddenStateAnalysisEncoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS] = hidden_activations_all_timesteps
 

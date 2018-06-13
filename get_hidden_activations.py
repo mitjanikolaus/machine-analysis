@@ -119,7 +119,7 @@ def run_model_on_test_data(model, data, get_batch_data):
         return dataset
 
 
-checkpoint_path = '../machine-zoo/guided/lstm/1/'
+checkpoint_path = '../machine-zoo/guided/gru/1/'
 test_data = '../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/heldout_tables.tsv'
 
 run_and_get_hidden_activations(
