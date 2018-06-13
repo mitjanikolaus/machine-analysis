@@ -18,30 +18,32 @@ from models.analysable_seq2seq import AnalysableSeq2seq
 from activations import ActivationsDataset
 from util import load_test_data
 
+def run_and_get_hidden_activations_with_test_set(model, test_set, save_path=None):
+    data_func = SupervisedTrainer.get_batch_data
+
+    activations_dataset = run_model_on_test_data(model=model, data=test_set, get_batch_data=data_func)
+
+    if save_path is not None:
+        activations_dataset.save(save_path)
+
+    return activations_dataset
 
 def run_and_get_hidden_activations(checkpoint_path, test_data_path, attention_method, use_attention_loss,
                                    ignore_output_eos, max_len=50, save_path=None):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    LOG_FORMAT = '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'
-    logging.basicConfig(format=LOG_FORMAT, level=getattr(logging, 'INFO'))
 
     # load model
     logging.info("loading checkpoint from {}".format(os.path.join(checkpoint_path)))
     checkpoint = AnalysableSeq2seq.load(checkpoint_path)
-    seq2seq = checkpoint.model
+    model = checkpoint.model
     input_vocab = checkpoint.input_vocab
     output_vocab = checkpoint.output_vocab
 
     #load test set
     test_set = load_test_data(test_data_path, input_vocab, output_vocab, ignore_output_eos, use_attention_loss, attention_method, max_len)
 
-    data_func = SupervisedTrainer.get_batch_data
+    return run_and_get_hidden_activations_with_test_set(model, test_set, save_path)
 
-    activations_dataset = run_model_on_test_data(model=seq2seq, data=test_set, get_batch_data=data_func)
 
-    if save_path is not None:
-        activations_dataset.save(save_path)
 
 
 def run_model_on_test_data(model, data, get_batch_data):
