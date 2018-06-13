@@ -73,12 +73,13 @@ def plot_activation_distributions(all_timesteps_activations: list, grid_size=Non
     fig, axes = plt.subplots(*grid_size, sharey=True)
     colors = _color_gradient("#a8bee3", "#e58625", n=num_timesteps)
 
-    for axis, activations, color in zip(axes, all_timesteps_activations, colors):
+    for t, (axis, activations, color) in enumerate(zip(axes, all_timesteps_activations, colors)):
         activations = activations.cpu().numpy()
         activations = _squeeze_out(activations)
         print(activations)
         num_bins = int(len(activations) / 4)
         axis.hist(activations, num_bins, density=True, facecolor=color, alpha=0.75)
+        axis.set_xlabel("t={}".format(t))
 
     fig.tight_layout()
     fig.suptitle("Distribution of activation values over {} time steps".format(num_timesteps))
@@ -96,4 +97,4 @@ if __name__ == "__main__":
     #plot_hidden_activations(data.encoder_activations[0], encoder_input_length, num_units_to_plot=50)
 
     # Plot distribution of activation values in a series of time steps
-    plot_activation_distributions(data.hidden_activations_decoder[12])
+    plot_activation_distributions(data.hidden_activations_encoder[12])
