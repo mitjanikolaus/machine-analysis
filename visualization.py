@@ -122,9 +122,9 @@ def plot_activation_gradients(all_timesteps_activations: np.array, neuron_heatma
 
 
 if __name__ == "__main__":
-    test_data_path = './baseline_gru_1_heldout_tables.pt'
+    test_data_path = './ga_gru_1_heldout_tables.pt'
     data = ActivationsDataset.load(test_data_path, convert_to_numpy=True)
-    target_activations = "hidden_activations_encoder"
+    target_activations = "hidden_activations_decoder"
 
     sample = getattr(data, target_activations)[12]  # Specific sample
     average = np.array(getattr(data, target_activations)).mean(axis=0)
