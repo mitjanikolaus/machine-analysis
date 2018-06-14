@@ -8,6 +8,7 @@ import torchtext
 
 import matplotlib.pyplot as plt
 import numpy as np
+from mpl_toolkits.axes_grid1 import AxesGrid
 
 from seq2seq.dataset import SourceField, TargetField, AttentionField
 
@@ -47,26 +48,40 @@ def load_test_data(test_data_path, input_vocab, output_vocab, ignore_output_eos,
     return test_set
 
 
-def plot_hidden_activations(activations, num_units_to_plot=50):
-    """
-    Plot hidden activations for 1 sample
-    """
+def plot_activations(all_timesteps_activations: np.array, neuron_heatmap_size: tuple, show_title=True, absolute=True):
+    num_timesteps = len(all_timesteps_activations)
 
-    num_timesteps = len(activations)
+    assert all([type(out) in (torch.Tensor, np.ndarray) for out in all_timesteps_activations]), \
+        "This function only takes all the activations for all the time steps of a single sample."
 
-    for ts in range(len(activations)):
-        activations[ts] = activations[ts].numpy()
+    fig = plt.figure()
 
-    activations = np.array(activations).reshape(-1, num_timesteps)
+    grid = AxesGrid(
+        fig, 111, nrows_ncols=(1, num_timesteps), axes_pad=0.05, share_all=True, label_mode="L",
+        cbar_location="right", cbar_mode="single",
+    )
 
-    activations = activations[np.random.choice(activations.shape[0], num_units_to_plot),:]
+    for t, (axis, current_activations) in enumerate(zip(grid, all_timesteps_activations[:])):
+        vmin, vmax = -2, 2
+        colormap = 'coolwarm'
 
-    heatmap = plt.imshow(activations, cmap='hot', interpolation='nearest')
-    plt.xticks(np.arange(0, num_timesteps, step=1))
-    plt.xlabel('timestep')
-    plt.ylabel('hidden unit')
-    plt.colorbar(heatmap)
+        if absolute:
+            vmin = 0
+            colormap = "Reds"
+
+        heatmap = axis.imshow(current_activations.reshape(*neuron_heatmap_size), cmap=colormap, vmin=vmin,
+                              vmax=vmax)
+        axis.set_xlabel("t={}".format(t))
+        axis.set_xticks([])
+        axis.set_yticks([])
+
+    grid.cbar_axes[0].colorbar(heatmap)
+
+    if show_title:
+        fig.suptitle("Activation values over {} time steps".format(num_timesteps))
+
     plt.show()
+
 
 
 def plot_activation_distributions(all_timesteps_activations: list, grid_size=None):
@@ -127,12 +142,14 @@ def plot_activation_distributions(all_timesteps_activations: list, grid_size=Non
     plt.show()
 
 
+
 if __name__ == "__main__":
-    test_data_path = './test_activations_gru_1_heldout_tables.pt'
+    test_data_path = './test_activations_lstm_1_heldout_tables.pt'
     data = ActivationsDataset.load(test_data_path)
 
-    # Plot activations as heat map
-    plot_hidden_activations(data.hidden_activations_decoder[0], num_units_to_plot=50)
+    # Plot activations over time as heat maps
+    plot_activations(data.hidden_activations_decoder[0], neuron_heatmap_size=(32, 16))
 
     # Plot distribution of activation values in a series of time steps
-    plot_activation_distributions(data.hidden_activations_decoder[12])
+    #plot_activation_distributions(data.hidden_activations_decoder[12])
+
