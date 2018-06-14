@@ -83,6 +83,43 @@ def plot_activations(all_timesteps_activations: np.array, neuron_heatmap_size: t
     plt.show()
 
 
+def plot_activations_multiple_samples(all_timesteps_activations: np.array, neuron_heatmap_size: tuple, title, show_title=True, absolute=True):
+    num_samples = len(all_timesteps_activations)
+    num_timesteps = len(all_timesteps_activations[0])
+
+    fig = plt.figure()
+
+    grid = AxesGrid(
+        fig, 111, nrows_ncols=(num_samples, num_timesteps), axes_pad=0.05, share_all=True, label_mode="L",
+        cbar_location="right", cbar_mode="single",
+    )
+
+    for sample in range(num_samples):
+        for t, (current_activations) in enumerate(all_timesteps_activations[sample][:]):
+            axis = grid[(sample*num_timesteps)+t]
+            vmin, vmax = -2, 2
+            colormap = 'coolwarm'
+
+            if absolute:
+                vmin = 0
+                colormap = "Reds"
+
+            heatmap = axis.imshow(current_activations.reshape(*neuron_heatmap_size), cmap=colormap, vmin=vmin,
+                                  vmax=vmax)
+            axis.set_xlabel("t={}".format(t))
+            axis.set_xticks([])
+            axis.set_yticks([])
+
+            grid.cbar_axes[0].colorbar(heatmap)
+
+    if show_title:
+        if title == None:
+            fig.suptitle("Activation values over {} time steps".format(num_timesteps))
+        else:
+            fig.suptitle(title)
+
+    plt.show()
+
 
 def plot_activation_distributions(all_timesteps_activations: list, grid_size=None):
     num_timesteps = len(all_timesteps_activations)
