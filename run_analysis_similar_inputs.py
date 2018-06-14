@@ -6,7 +6,7 @@ import torchtext
 
 from models.analysable_seq2seq import AnalysableSeq2seq
 
-from util import load_test_data, plot_activation_distributions
+from util import load_test_data, plot_activations_multiple_samples
 from get_hidden_activations import run_and_get_hidden_activations_with_test_set
 from activations import ActivationsDataset
 
@@ -26,6 +26,7 @@ def run_analysis():
     def other_input_criterium(sample):
         return len(sample.src) == 4 and sample.src[0] == '001'
 
+
     test_data_1 = '../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/heldout_compositions.tsv'
     test_data_2 = '../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/heldout_inputs.tsv'
     test_data_3 = '../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/heldout_tables.tsv'
@@ -33,6 +34,13 @@ def run_analysis():
     test_data_5 = '../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/train.tsv'
     test_data_6 = '../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/validation.tsv'
     test_data_paths = [test_data_1, test_data_2, test_data_3, test_data_4, test_data_5, test_data_6]
+
+    """
+    test_data_1 = '../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/longer_compositions_seen.tsv'
+    test_data_2 = '../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/longer_compositions_new.tsv'
+    test_data_3 = '../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/longer_compositions_incremental.tsv'
+    test_data_paths = [test_data_1, test_data_2, test_data_3]
+    """
 
     distances_similar_baseline = []
     distances_different_baseline = []
@@ -97,6 +105,17 @@ def run_models_and_evaluate(model_type, rnn_type, test_set_similar, test_set_dif
 
         activation_data_similar = ActivationsDataset.load(activations_path_similar)
         activation_data_different = ActivationsDataset.load(activations_path_different)
+
+        #plot_activations_multiple_samples(activation_data_similar.hidden_activations_decoder[0:3],
+        #                                  neuron_heatmap_size=(16, 32),
+        #                                  title='Hidden activations similar input {}'.format(model_type), show_title=True)
+
+
+        #plot_activations_multiple_samples(activation_data_different.hidden_activations_decoder[0:3],
+        #                                  neuron_heatmap_size=(16, 32),
+        #                                  title='Hidden activations different input {}'.format(model_type),
+        #                                  show_title=True)
+
 
         def calculate_distances(activation_data):
             distances = []
