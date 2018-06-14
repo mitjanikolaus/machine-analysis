@@ -134,8 +134,8 @@ if __name__ == "__main__":
     #plot_hidden_activations(data.encoder_activations[0], encoder_input_length, num_units_to_plot=50)
 
     # Plot distribution of activation values in a series of time steps
-    #plot_activation_distributions(SAMPLE)
+    plot_activation_distributions(average)
 
     # Plot changes in activations values
     #plot_activation_gradients(sample, neuron_heatmap_size=(16, 32))
-    plot_activation_gradients(average, neuron_heatmap_size=(16, 32), show_title=False, absolute=True)
+    #plot_activation_gradients(average, neuron_heatmap_size=(16, 32), show_title=False, absolute=True)

@@ -4,14 +4,28 @@ over multiple time steps.
 """
 
 # STD
+from collections import defaultdict
 from random import sample
 
 # EXT
 import numpy as np
 from numpy.linalg import norm
+from scipy.stats import kurtosis, skew
+
 
 # PROJECT
 from activations import ActivationsDataset
+
+
+def analyze_activation_distributions(all_timesteps_activations: np.array, moments=["mean", "variance"]):
+    all_timesteps_distributions = defaultdict(list)
+    moment_functions = {"mean": np.mean, "variance": np.var, "skewness": skew, "kurtosis": kurtosis}
+
+    for current_activations in all_timesteps_activations:
+        for moment in moments:
+            all_timesteps_distributions[moment].append(moment_functions[moment](current_activations))
+
+    return dict(all_timesteps_distributions)
 
 
 def analyze_activation_gradients(all_timesteps_activations: np.array,
@@ -43,11 +57,27 @@ if __name__ == "__main__":
     ga_gru_data = ActivationsDataset.load(ga_gru_data_path, convert_to_numpy=True)
     data_sets = [baseline_lstm_data, baseline_gru_data, ga_lstm_data, ga_gru_data]
 
-    # Do experiments
+    # Prepare for experiments
     num_samples = 3
-    target_activations = "hidden_activations_encoder"
+    target_activations = "hidden_activations_decoder"
     sample_indices = sample(range(len(baseline_gru_data)), num_samples)
 
+    # Activation distributions experiments
+    print("\n### Activation distributions ###\n")
+    for path, data_set in zip(data_set_paths, data_sets):
+        average_activations = np.array(getattr(data_set, target_activations)).mean(axis=0)
+        print("Results for {}:".format(path))
+        print("Distributions for the average of all samples", analyze_activation_distributions(average_activations))
+
+        for sample_index in sample_indices:
+            print(
+                "Norm for sample #{}:".format(sample_index),
+                analyze_activation_distributions(getattr(data_set, target_activations)[sample_index])
+            )
+        print("")
+
+    # Activation gradient experiments
+    print("\n### Activation gradients ###\n")
     for path, data_set in zip(data_set_paths, data_sets):
         average_activations = np.array(getattr(data_set, target_activations)).mean(axis=0)
         print("Results for {}:".format(path))
