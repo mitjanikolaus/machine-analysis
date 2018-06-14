@@ -10,7 +10,7 @@ from seq2seq.trainer import SupervisedTrainer
 from models.AnalysableSeq2seq import AnalysableSeq2seq
 from models.HiddenStateAnalysisDecoderRNN import HiddenStateAnalysisDecoderRNN
 from models.HiddenStateAnalysisEncoderRNN import HiddenStateAnalysisEncoderRNN
-from activations import ActivationsDataset
+from activations import ActivationsDataset, CounterDataset
 
 
 def run_and_get_hidden_activations(checkpoint_path, test_data_path, attention_method, use_attention_loss,
@@ -69,10 +69,10 @@ def run_and_get_hidden_activations(checkpoint_path, test_data_path, attention_me
 
     data_func = SupervisedTrainer.get_batch_data
 
-    activations_dataset = run_model_on_test_data(model=seq2seq, data=test, get_batch_data=data_func)
+    dataset = run_model_on_test_data(model=seq2seq, data=test, get_batch_data=data_func)
 
     if save_path is not None:
-        activations_dataset.save(save_path)
+        dataset.save(save_path)
 
 
 def run_model_on_test_data(model, data, get_batch_data):
@@ -91,22 +91,25 @@ def run_model_on_test_data(model, data, get_batch_data):
 
         # loop over test data
         with torch.no_grad():
-            for batch in batch_iterator:
+            for i, batch in enumerate(batch_iterator):
+
+                # if i > 10: break
+
                 input_variable, input_lengths, target_variable = get_batch_data(batch)
 
                 # using own forward path to get hidden states for all timesteps
                 decoder_outputs, decoder_hidden, ret_dict_decoder, ret_dict_encoder = model(input_variable, input_lengths.tolist(), target_variable)
 
-                print('\n\n\n')
-                print('decoder_outputs: ', decoder_outputs)
+                # print('\n\n\n')
+                # print('decoder_outputs: ', decoder_outputs)
 
                 hidden_activations_encoder = ret_dict_encoder[HiddenStateAnalysisEncoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS]
                 hidden_activations_decoder = ret_dict_decoder[HiddenStateAnalysisDecoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS]
-                print('\n\n\n')
-                print('Hidden activations of encoder: ', hidden_activations_encoder)
-
-                print('\n\n\n')
-                print('Hidden activations of decoder: ',ret_dict_decoder[HiddenStateAnalysisDecoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS])
+                # print('\n\n\n')
+                # print('Hidden activations of encoder: ', hidden_activations_encoder)
+                #
+                # print('\n\n\n')
+                # print('Hidden activations of decoder: ',ret_dict_decoder[HiddenStateAnalysisDecoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS])
 
                 all_input_seqs.append(input_variable)
                 all_encoder_activations.append(hidden_activations_encoder)
@@ -130,19 +133,61 @@ def run_model_on_test_data(model, data, get_batch_data):
 
                 #return
 
-        dataset = ActivationsDataset(
-            all_input_seqs, all_model_outputs,
+        # dataset = ActivationsDataset(
+        #     all_input_seqs, all_model_outputs,
+        #     encoder_activations=all_encoder_activations,
+        #     # decoder_activations=all_decoder_activations
+        # )
+
+        counter_dataset = CounterDataset(
+            all_input_seqs,
+            all_model_outputs,
             encoder_activations=all_encoder_activations,
             decoder_activations=all_decoder_activations
         )
 
-        return dataset
+        return counter_dataset
 
-
-checkpoint_path='../machine-zoo/guided/gru/1/'
 test_data='../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/heldout_tables.tsv'
 
-run_and_get_hidden_activations(
-    checkpoint_path, test_data, attention_method='mlp', use_attention_loss=True, ignore_output_eos=True,
-    save_path="./test_activations.pt"
-)
+cell_types = ['gru', 'lstm']
+model_types = ['guided', 'baseline']
+# model_runs = range(1, 5+1)
+model_runs = [1]
+checkpoint_template = '../machine-zoo/{}/{}/{}/'
+dataset_name_model_part = '{}_{}_run_{}'
+
+checkpoints = [
+    (checkpoint_template.format(model_type, cell_type, run), dataset_name_model_part.format(model_type, cell_type, run))
+        for run in model_runs
+        for cell_type in cell_types
+        for model_type in model_types
+]
+
+dataset_template = '../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/{}/sample{}/{}{}.tsv'
+dataset_name_data_part = 'sample_{}_{}_{}'
+lengths = ['samples', 'longer_compositions']
+# sample_numbers = range(1, 5+1)
+sample_numbers = [1]
+tasks = ['heldout_tables', 'heldout_compositions', 'new_compositions']
+
+datasets = [
+    (dataset_template.format(length, sample_number, task, '' if length == 'samples' else '4'), dataset_name_data_part.format(sample_number, task, 'simple' if length == 'samples' else length))
+        for length in lengths
+        for sample_number in sample_numbers
+        for task in tasks
+]
+
+for checkpoint, name_model_part in checkpoints:
+    for dataset, name_data_part in datasets:
+
+        print('data/{}_{}.pt'.format(name_model_part, name_data_part))
+
+        run_and_get_hidden_activations(
+            checkpoint,
+            dataset,
+            attention_method='mlp',
+            use_attention_loss=True,
+            ignore_output_eos=True,
+            save_path='data/counter_datasets/{}_{}.pt'.format(name_model_part, name_data_part)
+        )
