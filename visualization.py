@@ -2,9 +2,15 @@
 Define different utility functions, e.g. for different kinds of visualization.
 """
 
+# STD
+from random import sample
+import re
+
 # EXT
 import torch
 import matplotlib.pyplot as plt
+from matplotlib.pyplot import cm
+
 from mpl_toolkits.axes_grid1 import AxesGrid
 import numpy as np
 
@@ -32,6 +38,9 @@ def plot_hidden_activations(activations, input_length, num_units_to_plot=50):
 
 
 def plot_activation_distributions(all_timesteps_activations: np.array, grid_size=None, show_title=True):
+    """
+    Plot the distribution of activation values over multiple time steps for a single sample.
+    """
     num_timesteps = len(all_timesteps_activations)
 
     assert all([type(out) in (torch.Tensor, np.ndarray) for out in all_timesteps_activations]), \
@@ -83,7 +92,50 @@ def plot_activation_distributions(all_timesteps_activations: np.array, grid_size
     plt.show()
 
 
-def plot_activation_gradients(all_timesteps_activations: np.array, neuron_heatmap_size: tuple, show_title=True, absolute=True):
+def plot_activation_distributions_development(show_title=True, name_func=lambda name: name, **samples_all_time_step_activations):
+    """
+    Plot how the distributions of activation values change for multiple samples as a box and whiskers plot.
+    """
+    num_samples = len(samples_all_time_step_activations.keys())
+    num_timesteps = len(list(samples_all_time_step_activations.values())[0])
+
+    fig, axes = plt.subplots(nrows=1, ncols=num_timesteps, sharey=True)
+    colors = cm.viridis(np.linspace(0, 1, num_samples))
+    bplots = []
+
+    for t, axis in enumerate(axes):
+        bplot = axis.boxplot([
+            all_time_step_activations[t] for all_time_step_activations in samples_all_time_step_activations.values()
+        ], vert=True, sym="", patch_artist=True, whis=10000)  # Show min and max by setting whis very high
+        axis.set_xlabel("t={}".format(t))
+        axis.set_xticks([])
+        bplots.append(bplot)
+
+        # Coloring
+        for patch, color in zip(bplot["boxes"], colors):
+            patch.set_facecolor(color)
+
+    # Add legend
+    fig.subplots_adjust(bottom=0.2)
+    axes[int(num_timesteps/2)].legend(
+        [bplot for bplot in bplots[0]["boxes"]],
+        [name_func(name) for name in list(samples_all_time_step_activations.keys())],
+        loc="lower left", bbox_to_anchor=(-2.75, -0.2), borderaxespad=0.1, ncol=num_samples
+    )
+
+    if show_title:
+        fig.suptitle(
+            "Distributions of activation values of {} samples over {} time steps".format(num_samples, num_timesteps)
+        )
+
+    plt.show()
+
+
+def plot_activation_gradients(all_timesteps_activations: np.array, neuron_heatmap_size: tuple, show_title=True,
+                              absolute=True):
+    """
+    Plot the changes in activation values between time steps as heat maps for one single sample.
+    """
     num_timesteps = len(all_timesteps_activations)
 
     assert all([type(out) in (torch.Tensor, np.ndarray) for out in all_timesteps_activations]), \
@@ -121,20 +173,45 @@ def plot_activation_gradients(all_timesteps_activations: np.array, neuron_heatma
     plt.show()
 
 
-if __name__ == "__main__":
-    test_data_path = './ga_gru_1_heldout_tables.pt'
-    data = ActivationsDataset.load(test_data_path, convert_to_numpy=True)
-    target_activations = "hidden_activations_decoder"
+def get_name_from_activation_data_path(path):
+    pattern = re.compile(".*\/((baseline|ga)_(lstm|gru))_.*")
+    match = pattern.match(path).groups()[0]
+    return match
 
-    sample = getattr(data, target_activations)[12]  # Specific sample
-    average = np.array(getattr(data, target_activations)).mean(axis=0)
+
+if __name__ == "__main__":
+    # Path to activation data sets
+    baseline_lstm_data_path = './baseline_lstm_1_heldout_tables.pt'
+    baseline_gru_data_path = './baseline_gru_1_heldout_tables.pt'
+    ga_lstm_data_path = './ga_lstm_1_heldout_tables.pt'
+    ga_gru_data_path = './ga_gru_1_heldout_tables.pt'
+    data_set_paths = [baseline_lstm_data_path, baseline_gru_data_path, ga_lstm_data_path, ga_gru_data_path]
+
+    # Load everything
+    baseline_lstm_data = ActivationsDataset.load(baseline_lstm_data_path, convert_to_numpy=True)
+    baseline_gru_data = ActivationsDataset.load(baseline_gru_data_path, convert_to_numpy=True)
+    ga_lstm_data = ActivationsDataset.load(ga_lstm_data_path, convert_to_numpy=True)
+    ga_gru_data = ActivationsDataset.load(ga_gru_data_path, convert_to_numpy=True)
+    data_sets = [baseline_lstm_data, baseline_gru_data, ga_lstm_data, ga_gru_data]
+
+    # Prepare for experiments
+    num_samples = 3
+    target_activations = "hidden_activations_decoder"
+    sample_indices = sample(range(len(baseline_gru_data)), num_samples)
 
     # Plot activations as heat map
     #encoder_input_length = data.model_inputs[0].shape[1]-1
     #plot_hidden_activations(data.encoder_activations[0], encoder_input_length, num_units_to_plot=50)
 
     # Plot distribution of activation values in a series of time steps
-    plot_activation_distributions(average)
+    #plot_activation_distributions(average)
+    activation_dists_to_plot = {}
+    for path, data_set in zip(data_set_paths, data_sets):
+        average_activations = np.array(getattr(data_set, target_activations)).mean(axis=0)
+        activation_dists_to_plot[path] = average_activations
+
+    plot_activation_distributions_development(name_func=get_name_from_activation_data_path, **activation_dists_to_plot)
+
 
     # Plot changes in activations values
     #plot_activation_gradients(sample, neuron_heatmap_size=(16, 32))
