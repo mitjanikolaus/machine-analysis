@@ -60,7 +60,8 @@ if __name__ == "__main__":
     # Prepare for experiments
     num_samples = 3
     target_activations = "hidden_activations_decoder"
-    sample_indices = sample(range(len(baseline_gru_data)), num_samples)
+    #sample_indices = sample(range(len(baseline_gru_data)), num_samples)
+    sample_indices = [39, 52, 87]
 
     # Activation distributions experiments
     print("\n### Activation distributions ###\n")

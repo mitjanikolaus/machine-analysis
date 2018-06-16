@@ -23,7 +23,7 @@ def plot_hidden_activations(activations, input_length, num_units_to_plot=50):
     Plot hidden activations for 1 sample
     """
     for ts in range(len(activations)):
-        activations[ts] = activations[ts].numpy()
+        activations[ts] = activations[ts]
 
     activations = np.array(activations).reshape(-1, input_length)
 
@@ -75,7 +75,7 @@ def plot_activation_distributions(all_timesteps_activations: np.array, grid_size
     if grid_size is None:
         grid_size = (1, num_timesteps)
 
-    fig, axes = plt.subplots(*grid_size, sharey=True)
+    fig, axes = plt.subplots(*grid_size, sharey=True, figsize=(5, 4))
     colors = _color_gradient("#a8bee3", "#e58625", n=num_timesteps)
 
     for t, (axis, activations, color) in enumerate(zip(axes, all_timesteps_activations, colors)):
@@ -132,7 +132,7 @@ def plot_activation_distributions_development(show_title=True, name_func=lambda 
 
 
 def plot_activation_gradients(all_timesteps_activations: np.array, neuron_heatmap_size: tuple, show_title=True,
-                              absolute=True):
+                              absolute=True, save=None):
     """
     Plot the changes in activation values between time steps as heat maps for one single sample.
     """
@@ -170,7 +170,10 @@ def plot_activation_gradients(all_timesteps_activations: np.array, neuron_heatma
     if show_title:
         fig.suptitle("Activation value gradients over {} time steps".format(num_timesteps))
 
-    plt.show()
+    if save is None:
+        plt.show()
+    else:
+        plt.savefig(save, bbox_inches="tight")
 
 
 def get_name_from_activation_data_path(path):
@@ -196,23 +199,36 @@ if __name__ == "__main__":
 
     # Prepare for experiments
     num_samples = 3
-    target_activations = "hidden_activations_decoder"
-    sample_indices = sample(range(len(baseline_gru_data)), num_samples)
+    target_activations = "forget_gate_activations_encoder"
+    #sample_indices = sample(range(len(baseline_gru_data)), num_samples)
+    sample_indices = [39, 52, 87]
 
     # Plot activations as heat map
-    #encoder_input_length = data.model_inputs[0].shape[1]-1
-    #plot_hidden_activations(data.encoder_activations[0], encoder_input_length, num_units_to_plot=50)
+    #encoder_input_length = baseline_lstm_data.model_inputs[0].shape[1]-1
+    #plot_activation_distributions(baseline_lstm_data.hidden_activations_encoder[39], show_title=False)
 
     # Plot distribution of activation values in a series of time steps
-    #plot_activation_distributions(average)
     activation_dists_to_plot = {}
     for path, data_set in zip(data_set_paths, data_sets):
-        average_activations = np.array(getattr(data_set, target_activations)).mean(axis=0)
+        average_activations = getattr(data_set, target_activations)[52]
         activation_dists_to_plot[path] = average_activations
 
-    plot_activation_distributions_development(name_func=get_name_from_activation_data_path, **activation_dists_to_plot)
+    plot_activation_distributions_development(
+        name_func=get_name_from_activation_data_path, show_title=False, **activation_dists_to_plot
+    )
 
 
     # Plot changes in activations values
     #plot_activation_gradients(sample, neuron_heatmap_size=(16, 32))
-    #plot_activation_gradients(average, neuron_heatmap_size=(16, 32), show_title=False, absolute=True)
+    #plot_activation_gradients(
+    #    getattr(ga_lstm_data, target_activations).mean(axis=0), neuron_heatmap_size=(16, 32), show_title=False, absolute=True,
+    #)
+
+    # for model_name, data_set in zip(["baseline_lstm", "baseline_gru", "ga_lstm", "ga_gru"], data_sets):
+    #     for network_name, network_data in zip(["encoder", "decoder"], ["hidden_activations_encoder", "hidden_activations_decoder"]):
+    #         for act_name, target_activations_func in zip(["39", "avg"], [lambda x: x[39], lambda x: x.mean(axis=0)]):
+    #             plot_activation_gradients(
+    #                 target_activations_func(getattr(data_set, network_data)), neuron_heatmap_size=(16, 32),
+    #                 show_title=False, absolute=True,
+    #                 save="./fig/gradients_{}_{}_{}.png".format(model_name, network_name, act_name)
+    #             )
