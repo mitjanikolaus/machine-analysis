@@ -21,10 +21,10 @@ def run_analysis():
     rnn_type = 'gru'   # gru or lstm
     model_part_to_evaluate = 'decoder'  # encoder or decoder
     models_to_evaluate = [1]    # 1,2,3,4,5 (which model from the zoo to take)
-    timesteps_to_evaluate = [0,1,2]
+    timesteps_to_evaluate = [0,1]
 
     def similar_input_criterium(sample):
-        return len(sample.src) == 4 and sample.src[1] == 't1' and sample.src[2] == 't1' # and sample.src[0] == '000'
+        return len(sample.src) == 4 and sample.src[1] == 't3' and sample.src[2] == 't3' # and sample.src[0] == '000'
 
     def other_input_criterium(sample):
         return len(sample.src) == 4 #and sample.src[0] == '000'
@@ -58,9 +58,8 @@ def run_analysis():
                                                                similar_input_criterium, other_input_criterium,
                                                                ignore_output_eos, use_attention_loss, attention_method)
 
-    (distances_similar_baseline, distances_different_baseline) = run_models_and_evaluate('baseline', rnn_type, test_set_similar, test_set_different, timesteps_to_evaluate, model_part_to_evaluate, models_to_evaluate)
     (distances_similar_guided, distances_different_guided) = run_models_and_evaluate('guided', rnn_type, test_set_similar, test_set_different, timesteps_to_evaluate, model_part_to_evaluate, models_to_evaluate)
-
+    (distances_similar_baseline, distances_different_baseline) = run_models_and_evaluate('baseline', rnn_type, test_set_similar, test_set_different, timesteps_to_evaluate, model_part_to_evaluate, models_to_evaluate)
 
     plt.subplot(2, 1, 1)
     plt.plot(timesteps_to_evaluate, distances_similar_baseline, label="similar_inputs", linestyle='-', marker="o")
@@ -81,7 +80,7 @@ def run_analysis():
 
 def run_models_and_evaluate(model_type, rnn_type, test_set_similar, test_set_different, timesteps_to_evaluate, model_part_to_evaluate, models_to_evaluate):
     distances_similar_each_timestep = []
-    distances_different_each_timstep = []
+    distances_different_each_timestep = []
 
     for timestep in timesteps_to_evaluate:
         all_distances_similar = []
@@ -124,7 +123,7 @@ def run_models_and_evaluate(model_type, rnn_type, test_set_similar, test_set_dif
                     for j, input_sample_2 in enumerate(
                             getattr(activation_data, 'hidden_activations_' + model_part_to_evaluate)):
                         if not i == j:
-                            sample2 = input_sample_2[timestep].numpy().flatten()
+                            sample2 = input_sample_2[timestep+1].numpy().flatten()
                             single_distances = (np.square(np.subtract(sample, sample2)))
                             all_single_distances.append(single_distances)
                 return all_single_distances
@@ -132,28 +131,32 @@ def run_models_and_evaluate(model_type, rnn_type, test_set_similar, test_set_dif
             all_distances_similar.extend(calculate_distances(activation_data_similar))
             all_distances_different.extend(calculate_distances(activation_data_different))
 
-
-        print('\nTimestep: ', timestep)
-        print(model_type, ' similar: ')
-        mean_distances_per_cell = np.mean(all_distances_similar, axis=0)
-        outliers = np.where(
-            mean_distances_per_cell < (np.mean(mean_distances_per_cell) - 2 * np.std(mean_distances_per_cell)))[0]
-        print('outliers: ',outliers)
-        print(mean_distances_per_cell[outliers])
-
-
-        print(model_type, ' different: ')
-        mean_distances_per_cell = np.mean(all_distances_different, axis=0)
-        outliers = np.where(
-            mean_distances_per_cell < (np.mean(mean_distances_per_cell) - 2 * np.std(mean_distances_per_cell)))[0]
-        print('outliers: ',outliers)
-        print(mean_distances_per_cell[outliers])
-
         distances_similar_each_timestep.append(all_distances_similar)
-        distances_different_each_timstep.append(all_distances_different)
+        distances_different_each_timestep.append(all_distances_different)
+
+
+    mean_distances_similar_per_cell = np.mean(distances_similar_each_timestep, axis=1)
+    mean_distances_different_per_cell = np.mean(distances_different_each_timestep, axis=1)
+    plot_activations_multiple_samples([mean_distances_similar_per_cell],
+                                      neuron_heatmap_size=(16, 32),
+                                      title='distances similar {}'.format(model_type),
+                                      show_title=True, absolute=True)
+    
+    outliers_similar_t1_t2 = np.where(mean_distances_similar_per_cell[1] < (np.mean(mean_distances_similar_per_cell[1]) - 2 * np.std(mean_distances_similar_per_cell[1])))[0]
+    outliers_different_t1_t2 = np.where(mean_distances_different_per_cell[1] < (np.mean(mean_distances_different_per_cell[1]) - 2 * np.std(mean_distances_different_per_cell[1])))[0]
+
+    relevant_outliers = list(set(outliers_similar_t1_t2) - set(outliers_different_t1_t2))
+    relevant_outliers.sort()
+    print(relevant_outliers)
+
+    #activations = getattr(activation_data, 'hidden_activations_' + model_part_to_evaluate)):
+
+    #plot_activations_multiple_samples([mean_distances_different_per_cell], neuron_heatmap_size=(16, 32), title='distances different {}'.format(model_type), show_title=True)
+
+
 
     means_similar_each_timestep = np.mean(np.sqrt(np.sum(distances_similar_each_timestep, axis=2)),axis=1)
-    means_different_each_timestep = np.mean(np.sqrt(np.sum(distances_different_each_timstep, axis=2)),axis=1)
+    means_different_each_timestep = np.mean(np.sqrt(np.sum(distances_different_each_timestep, axis=2)),axis=1)
 
     return means_similar_each_timestep, means_different_each_timestep
 
