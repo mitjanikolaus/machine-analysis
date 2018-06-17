@@ -5,6 +5,7 @@ Train a diagnostic classifier to predict the existence of input sequence element
 # STD
 import random
 import math
+from itertools import product
 
 # EXT
 import numpy as np
@@ -14,6 +15,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 import torch.optim as optim
+from scipy.stats import pearsonr
 
 # PROJECT
 from activations import ActivationsDataset
@@ -150,6 +152,7 @@ if __name__ == "__main__":
     # Load data and split into sets
     seed = 12345
     num_models = 10
+    epochs = 50
     full_dataset = FunctionalGroupsDataset.load("./ga_gru_1_heldout_tables.pt")
     full_dataset.add_target_feature_label(
         target_feature=18, target_activations="hidden_activations_decoder"
@@ -174,17 +177,38 @@ if __name__ == "__main__":
 
     # Prepare model for training
     models = []
+
     for i in range(num_models):
         print("\nTraining model {}...\n".format(i+1))
         input_size = full_dataset.hidden_activations_decoder[0][0].size()[2]
         model = DiagnosticBinaryClassifier(input_size=input_size)
+
         criterion = nn.BCELoss()
         optimizer = optim.SGD(model.parameters(), lr=0.0001)
 
         # Train
-        train(model, training_data_loader, validation_data_loader, test_data_loader, criterion, optimizer, epochs=50)
+        train(model, training_data_loader, validation_data_loader, test_data_loader, criterion, optimizer, epochs=epochs)
         models.append(model)
 
     # Plotting
-    plot_multiple_model_weights(weights_to_plot=[model.linear.weight.detach().numpy() for model in models])
+    models_weights = [model.linear.weight.detach().numpy() for model in models]
+    plot_multiple_model_weights(weights_to_plot=models_weights)
+
+    # Test if weights are correlated
+    rhos = []
+    for (model_A, model_A_weights) in enumerate(models_weights):
+        row = []
+
+        for (model_B, model_B_weights) in enumerate(models_weights):
+            rho, _ = pearsonr(model_A_weights.squeeze(), model_B_weights.squeeze())
+            row.append("{:.2f}".format(rho))
+
+        rhos.append(row)
+
+    row_format = "{:>10}" * (len(models) + 1)
+    print(row_format.format("", *range(len(models))))
+    for model_num, row in zip(range(len(models)), rhos):
+        print(row_format.format(model_num, *row))
+
+
 
