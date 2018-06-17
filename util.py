@@ -83,7 +83,7 @@ def plot_activations(all_timesteps_activations: np.array, neuron_heatmap_size: t
     plt.show()
 
 
-def plot_activations_multiple_samples(all_timesteps_activations: np.array, neuron_heatmap_size: tuple, title, show_title=True, absolute=True):
+def plot_activations_multiple_samples(all_timesteps_activations: np.array, neuron_heatmap_size: tuple, title, show_title=True, absolute=False):
     num_samples = len(all_timesteps_activations)
     num_timesteps = len(all_timesteps_activations[0])
 
@@ -107,6 +107,7 @@ def plot_activations_multiple_samples(all_timesteps_activations: np.array, neuro
             heatmap = axis.imshow(current_activations.reshape(*neuron_heatmap_size), cmap=colormap, vmin=vmin,
                                   vmax=vmax)
             axis.set_xlabel("t={}".format(t))
+            axis.set_ylabel("sample {}".format(sample))
             axis.set_xticks([])
             axis.set_yticks([])
 

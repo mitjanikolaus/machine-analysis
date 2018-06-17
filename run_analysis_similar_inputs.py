@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 
 import torchtext
 
+from collections import Counter
+
+
 from models.analysable_seq2seq import AnalysableSeq2seq
 
 from util import load_test_data, plot_activations_multiple_samples
@@ -17,14 +20,14 @@ def run_analysis():
 
     rnn_type = 'gru'   # gru or lstm
     model_part_to_evaluate = 'decoder'  # encoder or decoder
-    models_to_evaluate = [1,2,3,4,5]    # 1,2,3,4,5 (which model from the zoo to take)
+    models_to_evaluate = [1]    # 1,2,3,4,5 (which model from the zoo to take)
     timesteps_to_evaluate = [0,1,2]
 
     def similar_input_criterium(sample):
-        return len(sample.src) == 4 and sample.src[1] == 't1' and sample.src[0] == '001'
+        return len(sample.src) == 4 and sample.src[1] == 't1' and sample.src[2] == 't1' # and sample.src[0] == '000'
 
     def other_input_criterium(sample):
-        return len(sample.src) == 4 and sample.src[0] == '001'
+        return len(sample.src) == 4 #and sample.src[0] == '000'
 
 
     test_data_1 = '../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/heldout_compositions.tsv'
@@ -42,10 +45,7 @@ def run_analysis():
     test_data_paths = [test_data_1, test_data_2, test_data_3]
     """
 
-    distances_similar_baseline = []
-    distances_different_baseline = []
-    distances_similar_guided = []
-    distances_different_guided = []
+
 
     #load checkpoint to get input and output vocab
     checkpoint_path = '../machine-zoo/baseline/' + rnn_type + '/'+str(models_to_evaluate[0])+'/'
@@ -58,28 +58,20 @@ def run_analysis():
                                                                similar_input_criterium, other_input_criterium,
                                                                ignore_output_eos, use_attention_loss, attention_method)
 
-    for timestep in timesteps_to_evaluate:
-        (mean_distance_similar_baseline, mean_distance_different_baseline) = run_models_and_evaluate('baseline', rnn_type, test_set_similar, test_set_different, timestep, model_part_to_evaluate, models_to_evaluate)
-        (mean_distance_similar_guided, mean_distance_different_guided) = run_models_and_evaluate('guided', rnn_type, test_set_similar, test_set_different, timestep, model_part_to_evaluate, models_to_evaluate)
+    (distances_similar_baseline, distances_different_baseline) = run_models_and_evaluate('baseline', rnn_type, test_set_similar, test_set_different, timesteps_to_evaluate, model_part_to_evaluate, models_to_evaluate)
+    (distances_similar_guided, distances_different_guided) = run_models_and_evaluate('guided', rnn_type, test_set_similar, test_set_different, timesteps_to_evaluate, model_part_to_evaluate, models_to_evaluate)
 
-        distances_similar_baseline.append(mean_distance_similar_baseline)
-        distances_different_baseline.append(mean_distance_different_baseline)
-        distances_similar_guided.append(mean_distance_similar_guided)
-        distances_different_guided.append(mean_distance_different_guided)
-        print('\nTimestep: ',timestep)
-        print('Baseline:\n Similar inputs: ',mean_distance_similar_baseline,' Different inputs: ',mean_distance_different_baseline, 'Delta: '+ str(mean_distance_similar_baseline-mean_distance_different_baseline))
-        print('Guided:\n Similar inputs: ',mean_distance_similar_guided,' Different inputs: ',mean_distance_different_guided, 'Delta: '+ str(mean_distance_similar_guided-mean_distance_different_guided))
 
     plt.subplot(2, 1, 1)
-    plt.plot(timesteps_to_evaluate, distances_similar_baseline, label="similar_inputs")
-    plt.plot(timesteps_to_evaluate, distances_different_baseline, label="different_inputs")
+    plt.plot(timesteps_to_evaluate, distances_similar_baseline, label="similar_inputs", linestyle='-', marker="o")
+    plt.plot(timesteps_to_evaluate, distances_different_baseline, label="different_inputs", linestyle='-', marker="o")
     plt.xticks(np.arange(min(timesteps_to_evaluate), max(timesteps_to_evaluate), step=1.0))
     plt.ylabel('Mean distance baseline')
     plt.legend(loc=2)
 
     plt.subplot(2, 1, 2)
-    plt.plot(timesteps_to_evaluate, distances_similar_guided, label="similar_inputs")
-    plt.plot(timesteps_to_evaluate, distances_different_guided, label="different_inputs")
+    plt.plot(timesteps_to_evaluate, distances_similar_guided, label="similar_inputs", linestyle='-', marker="o")
+    plt.plot(timesteps_to_evaluate, distances_different_guided, label="different_inputs", linestyle='-', marker="o")
     plt.xticks(np.arange(min(timesteps_to_evaluate), max(timesteps_to_evaluate), step=1.0))
     plt.xlabel('timestep')
     plt.ylabel('Mean distance guided')
@@ -87,49 +79,83 @@ def run_analysis():
 
     plt.show()
 
-def run_models_and_evaluate(model_type, rnn_type, test_set_similar, test_set_different, timestep_to_evaluate, model_part_to_evaluate, models_to_evaluate):
+def run_models_and_evaluate(model_type, rnn_type, test_set_similar, test_set_different, timesteps_to_evaluate, model_part_to_evaluate, models_to_evaluate):
+    distances_similar_each_timestep = []
+    distances_different_each_timstep = []
 
-    all_distances = ([],[])
+    for timestep in timesteps_to_evaluate:
+        all_distances_similar = []
+        all_distances_different = []
 
-    for model_id in models_to_evaluate:
-        activations_path_similar = 'activations_similar_'+model_type+'_' + rnn_type + '.pt'
-        activations_path_different = 'activations_different_'+model_type+'_' + rnn_type + '.pt'
+        for model_id in models_to_evaluate:
+            activations_path_similar = 'activations_similar_' + model_type + '_' + rnn_type + '.pt'
+            activations_path_different = 'activations_different_' + model_type + '_' + rnn_type + '.pt'
 
-        checkpoint_path = '../machine-zoo/'+model_type+'/' + rnn_type + '/'+str(model_id)+'/'
+            checkpoint_path = '../machine-zoo/' + model_type + '/' + rnn_type + '/' + str(model_id) + '/'
 
-        checkpoint = AnalysableSeq2seq.load(checkpoint_path)
-        model = checkpoint.model
+            checkpoint = AnalysableSeq2seq.load(checkpoint_path)
+            model = checkpoint.model
 
-        run_and_get_hidden_activations_with_test_set(model, test_set_similar, save_path=activations_path_similar)
-        run_and_get_hidden_activations_with_test_set(model, test_set_different, save_path=activations_path_different)
+            run_and_get_hidden_activations_with_test_set(model, test_set_similar, save_path=activations_path_similar)
+            run_and_get_hidden_activations_with_test_set(model, test_set_different,
+                                                         save_path=activations_path_different)
 
-        activation_data_similar = ActivationsDataset.load(activations_path_similar)
-        activation_data_different = ActivationsDataset.load(activations_path_different)
+            activation_data_similar = ActivationsDataset.load(activations_path_similar)
+            activation_data_different = ActivationsDataset.load(activations_path_different)
 
-        #plot_activations_multiple_samples(activation_data_similar.hidden_activations_decoder[0:3],
-        #                                  neuron_heatmap_size=(16, 32),
-        #                                  title='Hidden activations similar input {}'.format(model_type), show_title=True)
-
-
-        #plot_activations_multiple_samples(activation_data_different.hidden_activations_decoder[0:3],
-        #                                  neuron_heatmap_size=(16, 32),
-        #                                  title='Hidden activations different input {}'.format(model_type),
-        #                                  show_title=True)
+            """
+            plot_activations_multiple_samples(activation_data_similar.hidden_activations_decoder[0:3],
+                                              neuron_heatmap_size=(16, 32),
+                                              title='Hidden activations similar input {}'.format(model_type),
+                                              show_title=True)
 
 
-        def calculate_distances(activation_data):
-            distances = []
-            for input_sample in getattr(activation_data, 'hidden_activations_' + model_part_to_evaluate):
-                sample = input_sample[timestep_to_evaluate].numpy().flatten()
-                for input_sample_2 in getattr(activation_data, 'hidden_activations_' + model_part_to_evaluate):
-                    sample2 = input_sample_2[timestep_to_evaluate].numpy().flatten()
-                    distances.append(euclidean_distance(sample, sample2))
-            return distances
+            plot_activations_multiple_samples(activation_data_different.hidden_activations_decoder[0:3],
+                                              neuron_heatmap_size=(16, 32),
+                                              title='Hidden activations different input {}'.format(model_type),
+                                              show_title=True)
+            """
 
-        all_distances[0].extend(calculate_distances(activation_data_similar))
-        all_distances[1].extend(calculate_distances(activation_data_different))
+            def calculate_distances(activation_data):
+                all_single_distances = []
+                for i, input_sample in enumerate(
+                        getattr(activation_data, 'hidden_activations_' + model_part_to_evaluate)):
+                    sample = input_sample[timestep].numpy().flatten()
+                    for j, input_sample_2 in enumerate(
+                            getattr(activation_data, 'hidden_activations_' + model_part_to_evaluate)):
+                        if not i == j:
+                            sample2 = input_sample_2[timestep].numpy().flatten()
+                            single_distances = (np.square(np.subtract(sample, sample2)))
+                            all_single_distances.append(single_distances)
+                return all_single_distances
 
-    return (np.mean(all_distances[0]), np.mean(all_distances[1]))
+            all_distances_similar.extend(calculate_distances(activation_data_similar))
+            all_distances_different.extend(calculate_distances(activation_data_different))
+
+
+        print('\nTimestep: ', timestep)
+        print(model_type, ' similar: ')
+        mean_distances_per_cell = np.mean(all_distances_similar, axis=0)
+        outliers = np.where(
+            mean_distances_per_cell < (np.mean(mean_distances_per_cell) - 2 * np.std(mean_distances_per_cell)))[0]
+        print('outliers: ',outliers)
+        print(mean_distances_per_cell[outliers])
+
+
+        print(model_type, ' different: ')
+        mean_distances_per_cell = np.mean(all_distances_different, axis=0)
+        outliers = np.where(
+            mean_distances_per_cell < (np.mean(mean_distances_per_cell) - 2 * np.std(mean_distances_per_cell)))[0]
+        print('outliers: ',outliers)
+        print(mean_distances_per_cell[outliers])
+
+        distances_similar_each_timestep.append(all_distances_similar)
+        distances_different_each_timstep.append(all_distances_different)
+
+    means_similar_each_timestep = np.mean(np.sqrt(np.sum(distances_similar_each_timestep, axis=2)),axis=1)
+    means_different_each_timestep = np.mean(np.sqrt(np.sum(distances_different_each_timstep, axis=2)),axis=1)
+
+    return means_similar_each_timestep, means_different_each_timestep
 
 
 def euclidean_distance(x, y):
