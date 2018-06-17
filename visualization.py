@@ -3,7 +3,6 @@ Define different utility functions, e.g. for different kinds of visualization.
 """
 
 # STD
-from random import sample
 import re
 
 # EXT
@@ -34,6 +33,30 @@ def plot_hidden_activations(activations, input_length, num_units_to_plot=50):
     plt.xlabel('timestep')
     plt.ylabel('hidden unit')
     plt.colorbar(heatmap)
+    plt.show()
+
+
+def plot_multiple_model_weights(weights_to_plot):
+    """
+    Plot the weights of different models side by side as a heat maps.
+    """
+    models_weights = np.array([rectangularfy(weights) for weights in weights_to_plot])
+    vmax = models_weights.max()
+    vmin = models_weights.min()
+
+    fig = plt.figure()
+    grid = AxesGrid(
+        fig, 111, nrows_ncols=(1, len(models_weights)), axes_pad=0.05, share_all=True, label_mode="L",
+        cbar_location="right", cbar_mode="single",
+    )
+
+    for axis, model_weights in zip(grid, models_weights):
+        heatmap = axis.imshow(model_weights, cmap="coolwarm", vmax=vmax, vmin=vmin)
+        axis.set_xticks([])
+        axis.set_yticks([])
+
+    grid.cbar_axes[0].colorbar(heatmap)
+
     plt.show()
 
 
@@ -180,6 +203,31 @@ def get_name_from_activation_data_path(path):
     pattern = re.compile(".*\/((baseline|ga)_(lstm|gru))_.*")
     match = pattern.match(path).groups()[0]
     return match
+
+
+def rectangularfy(array):
+    """
+    Try to reshape an numpy error so it gets as rectangular as possible.
+    """
+    assert 1 == array.shape[0]
+    assert len(array.shape) == 2
+
+    last_dim_mismatch = np.inf
+
+    while True:
+        try:
+            new_array = array.reshape(int(array.shape[0] * 2), int(array.shape[1] / 2))
+            current_mismatch = np.abs(array.shape[0] - array.shape[1])
+
+            if current_mismatch >= last_dim_mismatch:
+                break
+
+            array = new_array
+            last_dim_mismatch = current_mismatch
+        except Exception as e:
+            break
+
+    return array
 
 
 if __name__ == "__main__":

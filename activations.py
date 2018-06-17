@@ -30,7 +30,7 @@ class ActivationsDataset(Dataset):
         for name, activation_list in activations.items():
             setattr(self, name, activation_list)
 
-        self.data = zip(model_inputs, *activations.values())
+        self.data = list(zip(model_inputs, *activations.values()))
         self.length = len(model_inputs)
 
     def __len__(self):
