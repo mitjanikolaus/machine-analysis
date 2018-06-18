@@ -5,6 +5,7 @@ Train a diagnostic classifier to predict the existence of input sequence element
 # STD
 import random
 import math
+from collections import Counter
 
 # EXT
 import torch
@@ -14,6 +15,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 import torch.optim as optim
 from scipy.stats import pearsonr
+import numpy as np
 
 # PROJECT
 from activations import ActivationsDataset
@@ -182,9 +184,53 @@ def print_correlation_matrix(models_weights):
         print(row_format.format(model_num, *row))
 
 
+def test_neuron_significance(models_weights, p=0.01):
+    """
+    Test whether some neurons responded in a statistically significant manner to an input based on the weights of
+    several independently trained diagnostic classifiers. The test is a combination of a two-tailed and a one-tailed
+    significance test:
+
+    1. (For every single DC) Detect neurons that have been assigned significant weight values by checking whether for
+    their weight w holds w > mu + 2 * sigma or w < mu - 2 * mu, effectively placing them in the 2.2 % of either side
+    of the weight value distribution.
+
+    2. (Across all DCs) Check how often the DCs agree on deeming neurons significant based on criterion 1. and see if
+    the number of agreements is higher than for 95 % of all other neurons.
+    """
+    # 1. Step: Find candidate neurons
+    candidate_neurons = [
+        list(np.where(np.abs(model_weights) > model_weights.mean() + 2 * model_weights.std())[1])
+        for model_weights in models_weights
+    ]
+
+    # 2. Step: Count agreements for each neurons
+    num_neurons = models_weights[0].shape[1]
+    agreements = Counter({neuron: 0 for neuron in range(num_neurons)})
+
+    for classifier_candidates in candidate_neurons:
+        agreements.update(classifier_candidates)
+
+    # TODO: This doesn't work, selects to many neurons
+    # Find the neurons that account for 1 - p per cent of all agreements. Those are the significant ones
+    cumulative_agreements = 0
+    total_agreements = sum(agreements.values())
+    significant_neurons = []
+    sorted_agreements = sorted(agreements.items(), key=lambda x: x[1], reverse=True)
+
+    for neuron, neuron_agreements in sorted_agreements:
+        significant_neurons.append((neuron, neuron_agreements))
+        cumulative_agreements += neuron_agreements
+
+        if cumulative_agreements > (1 - p) * total_agreements:
+            break
+
+    print(significant_neurons)
+    return significant_neurons
+
+
 if __name__ == "__main__":
     # Load data and split into sets
-    num_models = 10
+    num_models = 15
     epochs = 50
     target_feature = 3  # t1 = 3
 
@@ -226,6 +272,9 @@ if __name__ == "__main__":
 
     # Plotting
     models_weights = [model.linear.weight.detach().numpy() for model in models]
-    plot_multiple_model_weights(weights_to_plot=models_weights)
+    # print_correlation_matrix(models_weights)
+    # plot_multiple_model_weights(weights_to_plot=models_weights)
+    test_neuron_significance(models_weights)
+
 
 
