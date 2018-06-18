@@ -1,13 +1,19 @@
+"""
+Define a subclass of the Seq2Seq model which allows to store and analyze its activations.
+"""
+
+# EXT
 from seq2seq.models import Seq2seq
 from seq2seq.models.attention import MLP, Dot, HardGuidance, Concat
 from seq2seq.util.checkpoint import Checkpoint
 from torch.nn import GRU, LSTM
 
-from .HiddenStateAnalysisDecoderRNN import HiddenStateAnalysisDecoderRNN
-from .HiddenStateAnalysisEncoderRNN import HiddenStateAnalysisEncoderRNN
+# PROJECT
+from .analysable_decoder import HiddenStateAnalysisDecoderRNN
+from .analysable_encoder import HiddenStateAnalysisEncoderRNN
+
 
 class AnalysableSeq2seq(Seq2seq):
-
 
     @staticmethod
     def load(path_to_checkpoint: str):
@@ -93,7 +99,6 @@ class AnalysableSeq2seq(Seq2seq):
             target_output = None
             provided_attention = None
 
-
         encoder_outputs, encoder_hidden, ret_dict_encoder = self.encoder(input_variable, input_lengths)
         result = self.decoder(inputs=target_output,
                               encoder_hidden=encoder_hidden,
@@ -102,6 +107,3 @@ class AnalysableSeq2seq(Seq2seq):
                               teacher_forcing_ratio=teacher_forcing_ratio,
                               provided_attention=provided_attention)
         return result + (ret_dict_encoder,)
-
-#model = AnalysableSeq2seq.load('../../machine-zoo/guided/gru/1')
-#print(model)

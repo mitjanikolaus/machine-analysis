@@ -1,16 +1,26 @@
+"""
+Define a function to retrieve a wide variety of activations for later analysis.
+"""
+
+# STD
 import logging
 import os
+from collections import defaultdict
 
+# EXT
+import numpy as np
 import torch
 import torchtext
-
 from seq2seq.dataset import SourceField, TargetField, AttentionField
 from seq2seq.trainer import SupervisedTrainer
 
-from models.AnalysableSeq2seq import AnalysableSeq2seq
-from models.HiddenStateAnalysisDecoderRNN import HiddenStateAnalysisDecoderRNN
-from models.HiddenStateAnalysisEncoderRNN import HiddenStateAnalysisEncoderRNN
+# from models.AnalysableSeq2seq import AnalysableSeq2seq
+# from models.HiddenStateAnalysisDecoderRNN import HiddenStateAnalysisDecoderRNN
+# from models.HiddenStateAnalysisEncoderRNN import HiddenStateAnalysisEncoderRNN
 from activations import ActivationsDataset, CounterDataset
+from models.analysable_decoder import HiddenStateAnalysisDecoderRNN
+from models.analysable_encoder import HiddenStateAnalysisEncoderRNN
+from models.analysable_seq2seq import AnalysableSeq2seq
 
 
 def run_and_get_hidden_activations(checkpoint_path, test_data_path, attention_method, use_attention_loss,
@@ -81,6 +91,7 @@ def run_model_on_test_data(model, data, get_batch_data):
         all_encoder_activations = []
         all_decoder_activations = []
         all_model_outputs = []
+        all_model_activations = defaultdict(list)
 
         # create batch iterator
         iterator_device = torch.cuda.current_device() if torch.cuda.is_available() else -1
@@ -93,6 +104,7 @@ def run_model_on_test_data(model, data, get_batch_data):
         with torch.no_grad():
             for i, batch in enumerate(batch_iterator):
 
+                # TODO: use for getting smaller datasets for debugging
                 # if i > 10: break
 
                 input_variable, input_lengths, target_variable = get_batch_data(batch)
@@ -100,43 +112,41 @@ def run_model_on_test_data(model, data, get_batch_data):
                 # using own forward path to get hidden states for all timesteps
                 decoder_outputs, decoder_hidden, ret_dict_decoder, ret_dict_encoder = model(input_variable, input_lengths.tolist(), target_variable)
 
-                # print('\n\n\n')
-                # print('decoder_outputs: ', decoder_outputs)
 
                 hidden_activations_encoder = ret_dict_encoder[HiddenStateAnalysisEncoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS]
                 hidden_activations_decoder = ret_dict_decoder[HiddenStateAnalysisDecoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS]
-                # print('\n\n\n')
-                # print('Hidden activations of encoder: ', hidden_activations_encoder)
-                #
-                # print('\n\n\n')
-                # print('Hidden activations of decoder: ',ret_dict_decoder[HiddenStateAnalysisDecoderRNN.KEY_HIDDEN_ACTIVATIONS_ALL_TIMESTEPS])
 
                 all_input_seqs.append(input_variable)
                 all_encoder_activations.append(hidden_activations_encoder)
                 all_decoder_activations.append(hidden_activations_decoder)
                 all_model_outputs.append(all_decoder_activations)
 
-                import matplotlib.pyplot as plt
-                import numpy as np
+                for timestep in range(len(hidden_activations_encoder)):
+                   hidden_activations_encoder[timestep] = hidden_activations_encoder[timestep].numpy()
 
-
-                #for ts in range(len(hidden_activations_encoder)):
-                #    hidden_activations_encoder[ts] = hidden_activations_encoder[ts].numpy()
-
-                #hidden_activations_encoder = np.array(hidden_activations_encoder).reshape(4, 512)
+                # hidden_activations_encoder = np.array(hidden_activations_encoder).reshape(4, 512)
 
                 #plot first 100 hidden activations
-                #hidden_activations_encoder = hidden_activations_encoder[:,0:100]
+                # hidden_activations_encoder = hidden_activations_encoder[:,0:100]
+                decoder_outputs, decoder_hidden, return_dict_decoder, return_dict_encoder = model(
+                    input_variable, input_lengths.tolist(), target_variable
+                )
+                current_sample_model_activations = dict(return_dict_encoder)
+                current_sample_model_activations.update(return_dict_decoder)
 
-                #plt.imshow(hidden_activations_encoder, cmap='hot', interpolation='nearest')
-                #plt.show()
+                # Store activations
+                for activations_name, activations in current_sample_model_activations.items():
+                    if "activations" in activations_name:
+                        all_model_activations[activations_name].append(activations)
 
-                #return
+                # Store inputs and outputs
+                all_input_seqs.append(input_variable)
+                all_model_outputs.append(decoder_outputs)
 
         # dataset = ActivationsDataset(
         #     all_input_seqs, all_model_outputs,
         #     encoder_activations=all_encoder_activations,
-        #     # decoder_activations=all_decoder_activations
+        #     decoder_activations=all_decoder_activations
         # )
 
         counter_dataset = CounterDataset(
@@ -191,3 +201,12 @@ for checkpoint, name_model_part in checkpoints:
             ignore_output_eos=True,
             save_path='data/decoder_counter_datasets/{}_{}.pt'.format(name_model_part, name_data_part)
         )
+
+
+# checkpoint_path = '../machine-zoo/guided/gru/1/'
+# test_data = '../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/heldout_tables.tsv'
+#
+# run_and_get_hidden_activations(
+#     checkpoint_path, test_data, attention_method='mlp', use_attention_loss=True, ignore_output_eos=True,
+#     save_path="./test_activations_gru_1_heldout_tables.pt"
+# )
