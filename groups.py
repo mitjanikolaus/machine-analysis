@@ -210,7 +210,7 @@ def test_neuron_significance(models_weights, p=0.01):
     for classifier_candidates in candidate_neurons:
         agreements.update(classifier_candidates)
 
-    # TODO: This doesn't work, selects to many neurons
+    # TODO: This doesn't work, selects too many neurons
     # Find the neurons that account for 1 - p per cent of all agreements. Those are the significant ones
     cumulative_agreements = 0
     total_agreements = sum(agreements.values())
@@ -230,14 +230,30 @@ def test_neuron_significance(models_weights, p=0.01):
 
 if __name__ == "__main__":
     # Load data and split into sets
-    num_models = 15
+    num_models = 1
     epochs = 50
     target_feature = 3  # t1 = 3
 
-    full_dataset = FunctionalGroupsDataset.load("./ga_lstm_1_heldout_tables.pt")
+    full_dataset = FunctionalGroupsDataset.load("./guided_gru_1_train.pt")
+
+
+    train_neurons_subset = [15, 96, 104, 165, 226, 353, 426, 441]
+
+    #full_dataset.hidden_activations_decoder
+    hidden_activations_decoder_subset = []
+
+    for sample in full_dataset.hidden_activations_decoder:
+        sample_subset = []
+        for sample_timestep in sample:
+            sample_subset.append(sample_timestep[:,:,train_neurons_subset])
+        hidden_activations_decoder_subset.append(sample_subset)
+
+    full_dataset.hidden_activations_decoder = hidden_activations_decoder_subset
+
     full_dataset.add_target_feature_label(
-        target_feature=target_feature, target_activations="hidden_activations_decoder", position_sensitive=2
+        target_feature=target_feature, target_activations="hidden_activations_decoder", position_sensitive=-1
     )
+
 
     training_indices, validation_indices, test_indices = _split(len(full_dataset), ratio=(0.8, 0.1, 0.1))
 
