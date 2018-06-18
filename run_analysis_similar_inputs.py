@@ -21,10 +21,10 @@ def run_analysis():
     rnn_type = 'gru'   # gru or lstm
     model_part_to_evaluate = 'decoder'  # encoder or decoder
     models_to_evaluate = [1]    # 1,2,3,4,5 (which model from the zoo to take)
-    timesteps_to_evaluate = [0,1]
+    timesteps_to_evaluate = [0,1,2]
 
     def similar_input_criterium(sample):
-        return len(sample.src) == 4 and sample.src[1] == 't3' and sample.src[2] == 't3' # and sample.src[0] == '000'
+        return len(sample.src) == 4 and sample.src[2] == 't1' #and sample.src[0] == '000' #and sample.src[2] == 't3' #
 
     def other_input_criterium(sample):
         return len(sample.src) == 4 #and sample.src[0] == '000'
@@ -123,7 +123,7 @@ def run_models_and_evaluate(model_type, rnn_type, test_set_similar, test_set_dif
                     for j, input_sample_2 in enumerate(
                             getattr(activation_data, 'hidden_activations_' + model_part_to_evaluate)):
                         if not i == j:
-                            sample2 = input_sample_2[timestep+1].numpy().flatten()
+                            sample2 = input_sample_2[timestep].numpy().flatten()
                             single_distances = (np.square(np.subtract(sample, sample2)))
                             all_single_distances.append(single_distances)
                 return all_single_distances
@@ -142,10 +142,10 @@ def run_models_and_evaluate(model_type, rnn_type, test_set_similar, test_set_dif
                                       title='distances similar {}'.format(model_type),
                                       show_title=True, absolute=True)
     
-    outliers_similar_t1_t2 = np.where(mean_distances_similar_per_cell[1] < (np.mean(mean_distances_similar_per_cell[1]) - 2 * np.std(mean_distances_similar_per_cell[1])))[0]
-    outliers_different_t1_t2 = np.where(mean_distances_different_per_cell[1] < (np.mean(mean_distances_different_per_cell[1]) - 2 * np.std(mean_distances_different_per_cell[1])))[0]
+    outliers_similar_t2 = np.where(mean_distances_similar_per_cell[2] < (np.mean(mean_distances_similar_per_cell[2]) - 2 * np.std(mean_distances_similar_per_cell[2])))[0]
+    outliers_different_t2 = np.where(mean_distances_different_per_cell[2] < (np.mean(mean_distances_different_per_cell[2]) - 2 * np.std(mean_distances_different_per_cell[2])))[0]
 
-    relevant_outliers = list(set(outliers_similar_t1_t2) - set(outliers_different_t1_t2))
+    relevant_outliers = list(set(outliers_similar_t2) - set(outliers_different_t2))
     relevant_outliers.sort()
     print(relevant_outliers)
 
