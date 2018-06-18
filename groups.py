@@ -162,9 +162,9 @@ def train(model: DiagnosticBinaryClassifier, train_data_loader, valid_data_loade
         print("Test accuracy for epoch #{}/{}: {:.2f} %".format(epoch+1, epochs, test_accuracy))
 
 
-def print_correlation_matrix(arrays):
+def print_correlation_matrix(models_weights):
     """
-    Print a matrix of Pearson's rhos, showing all possible degrees of correlation between a pair of arrays.
+    Print a matrix of Pearson's rhos, showing all possible degrees of correlation between a pair of model weights.
     """
     rhos = []
     for (model_A, model_A_weights) in enumerate(models_weights):
