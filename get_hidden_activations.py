@@ -189,5 +189,5 @@ for checkpoint, name_model_part in checkpoints:
             attention_method='mlp',
             use_attention_loss=True,
             ignore_output_eos=True,
-            save_path='data/counter_datasets/{}_{}.pt'.format(name_model_part, name_data_part)
+            save_path='data/decoder_counter_datasets/{}_{}.pt'.format(name_model_part, name_data_part)
         )

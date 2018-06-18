@@ -51,7 +51,8 @@ class CounterDataset(ActivationsDataset):
         super(CounterDataset, self).__init__(model_inputs, model_outputs, **activations)
 
         # Make data have the structure (timestep: int, activation: Tensor), with activation being size 1 x 1 x hidden_size
-        self.data = _flatten_list([list(enumerate(activation[1])) for activation in self.data])
+        # 1 for encoder, 2 for decoder
+        self.data = _flatten_list([list(enumerate(activation[2])) for activation in self.data])
         self.length = len(self.data)
 
     def __getitem__(self, item: int) -> Tuple[int, Tensor]:

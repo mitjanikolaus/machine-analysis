@@ -5,6 +5,7 @@ import random
 import math
 from typing import Tuple, List
 
+import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
@@ -38,11 +39,12 @@ class Regression(nn.Module):
 
         hidden_size = 30
 
-        self.linear = nn.Sequential(
-            nn.Linear(input_size, hidden_size),
-            nn.Tanh(),
-            nn.Linear(hidden_size, 1)
-        )
+        # self.linear = nn.Sequential(
+        #     nn.Linear(input_size, hidden_size),
+        #     nn.Tanh(),
+        #     nn.Linear(hidden_size, 1)
+        # )
+        self.linear = nn.Linear(input_size, 1)
 
     def forward(self, input):
         return self.linear(input)
@@ -69,6 +71,7 @@ def fit_regression(directory: str, file: str, epochs=50):
     )
 
     regression = Regression(512)
+    best_model = regression.state_dict()
     optimiser = optim.SGD(regression.parameters(), lr=0.0001)
     criterion = nn.MSELoss()
     validation_criterion = nn.MSELoss()
@@ -99,31 +102,35 @@ def fit_regression(directory: str, file: str, epochs=50):
 
         for target, sample in validation_data_loader:
             prediction = regression(sample.view(-1))
-            validation_loss += validation_criterion(prediction, target.float())
+            validation_loss += validation_criterion(prediction, target.float()) / len(validation_data_loader)
 
-        validation_losses.append(validation_loss / len(validation_data_loader))
+        validation_losses.append(validation_loss)
+
+        if validation_loss <= min(validation_losses):
+            best_model = regression.state_dict()
 
     plt.plot(range(len(training_losses)), [float(t) for t in training_losses], label='training loss')
     plt.plot(range(len(validation_losses)), [float(v) for v in validation_losses], label='validation loss')
     plt.legend(loc='upper right')
 
-    plt.savefig('plots/regression_learning_curves/{}.png'.format(file.split('.')[0]))
+    plt.savefig('results/regression_learning_curves/{}.png'.format(file.split('.')[0]))
     plt.clf()
 
-    return min(training_losses), min(validation_losses)
+    return best_model, min(training_losses), min(validation_losses)
 
 
-data_directory = 'data/counter_datasets/'
+data_directory = 'data/encoder_counter_datasets/'
 
-with open('plots/regression_evaluation.csv', 'a') as evaluation:
+with open('results/regression_evaluation.csv', 'a') as evaluation:
 
     writer = csv.writer(evaluation)
 
     for file in os.listdir(data_directory):
 
-        if file.split('.')[0] + '.png' in os.listdir('plots/regression_learning_curves/'): continue
+        if file.split('.')[0] + '.png' in os.listdir('results/regression_learning_curves/'): continue
 
         if file.endswith('.pt'):
-            training_loss, validation_loss = fit_regression(data_directory, file, epochs=50)
+            model, training_loss, validation_loss = fit_regression(data_directory, file, epochs=50)
             writer.writerow([file.split('.')[0], float(training_loss), float(validation_loss)])
 
+            torch.save(model, 'results/models/{}.pt'.format(file.split('.')[0]))
