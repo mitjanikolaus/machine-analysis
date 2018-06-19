@@ -15,6 +15,7 @@ from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 import torch.optim as optim
 from scipy.stats import pearsonr
+from sklearn.linear_model import LogisticRegression
 import numpy as np
 
 # PROJECT
@@ -36,6 +37,7 @@ def _split(length: int, ratio=(0.9, 0.05, 0.05)):
     test_indices = indices[valid_cutoff:]
 
     return train_indices, valid_indices, test_indices
+
 
 
 class FunctionalGroupsDataset(ActivationsDataset):
@@ -61,7 +63,7 @@ class FunctionalGroupsDataset(ActivationsDataset):
             ))
         )
 
-    def add_target_feature_label(self, target_feature: int, target_activations: str, position_sensitive=-1, inputs_for_regressor=False):
+    def add_target_feature_label(self, target_feature: int, target_activations: str, position_sensitive=-1):
         """
         Add a binary label to every instance in the data set, telling whether a target feature is present in the input
         sequence (and if it is at a specified position given that position_sensitive > -1).
@@ -89,17 +91,47 @@ class FunctionalGroupsDataset(ActivationsDataset):
                     class_label = torch.Tensor([0])
 
                 self.presence_column.append(class_label)
-                if inputs_for_regressor:
-                    self.selected_decoder_hidden_states.append(decoder_hidden_states[occurrence_index].flatten())
-                else:
-                    self.selected_decoder_hidden_states.append(decoder_hidden_states[occurrence_index])
+                self.selected_decoder_hidden_states.append(decoder_hidden_states[occurrence_index])
 
             # Overwrite data using the new class label column
-            if inputs_for_regressor:
-                self.selected_decoder_hidden_states = np.array(self.selected_decoder_hidden_states)
-                self.presence_column = np.array(self.presence_column)
-            else:
-                self.data = list(zip(self.selected_decoder_hidden_states, self.presence_column))
+            self.data = list(zip(self.selected_decoder_hidden_states, self.presence_column))
+
+            self.target_feature_label_added = True  # Only allow this logic to be called once
+
+    def add_target_feature_label_regressor(self, target_feature: int, target_activations: str, position_sensitive=-1):
+        """
+        Add a binary label to every instance in the data set, telling whether a target feature is present in the input
+        sequence (and if it is at a specified position given that position_sensitive > -1).
+        """
+        if not self.target_feature_label_added:
+            # Column describing whether the target feature is present in input sequence
+            self.columns = [target_activations, "target_feature_present"]
+
+            for model_input, decoder_hidden_states in zip(self.model_inputs, getattr(self, target_activations)):
+                occurrences = model_input == target_feature
+                occurrence_index = occurrences.squeeze().nonzero()[0]  # Index of timestep where input occurred
+
+                # TODO include all input samples!
+                # Target feature not in input: Select random decoder output
+                if len(occurrence_index) == 0:
+                    occurrence_index = random.sample(range(len(decoder_hidden_states)), k=1)[0]
+                # Target feature in input: Take decoder hidden time step corresponding to input time step
+                else:
+                    occurrence_index = occurrence_index[0]
+
+                # Check whether the target feature appears in the input sequence and whether it is at a specific
+                # position if position_sensitive > -1
+                if occurrences.any() and (position_sensitive == -1 or occurrences[:, position_sensitive]):
+                    class_label = torch.Tensor([1])
+                else:
+                    class_label = torch.Tensor([0])
+
+                self.presence_column.append(class_label)
+                self.selected_decoder_hidden_states.append(decoder_hidden_states[occurrence_index].reshape(-1))
+
+            # Overwrite data using the new class label column
+            self.selected_decoder_hidden_states = np.array(self.selected_decoder_hidden_states)
+            self.presence_column = np.array(self.presence_column)
 
             self.target_feature_label_added = True  # Only allow this logic to be called once
 
@@ -237,75 +269,28 @@ def test_neuron_significance(models_weights, p=0.01):
 
 if __name__ == "__main__":
     # Load data and split into sets
-    num_models = 1
+    num_models = 10
     epochs = 50
     target_feature = 3  # t1 = 3
 
     full_dataset = FunctionalGroupsDataset.load("./guided_gru_1_train.pt", convert_to_numpy=True)
 
-    train_neurons_subset = [15, 96, 104, 165, 226, 353, 426, 441]
-
-    #full_dataset.hidden_activations_decoder
-    hidden_activations_decoder_subset = []
-
-    for sample in full_dataset.hidden_activations_decoder:
-        sample_subset = []
-        for sample_timestep in sample:
-            sample_subset.append(sample_timestep[train_neurons_subset])
-        hidden_activations_decoder_subset.append(np.array(sample_subset))
-
-    #full_dataset.hidden_activations_decoder = hidden_activations_decoder_subset
-
-    full_dataset.add_target_feature_label(
-        target_feature=target_feature, target_activations="hidden_activations_decoder", position_sensitive=-1, inputs_for_regressor=True
+    full_dataset.add_target_feature_label_regressor(
+        target_feature=target_feature, target_activations="hidden_activations_decoder", position_sensitive=-1
     )
-
-
-    training_indices, validation_indices, test_indices = _split(len(full_dataset), ratio=(0.8, 0.1, 0.1))
-
-    from sklearn.linear_model import LogisticRegression
-
-    regressor = LogisticRegression()
-
-    #TODO include all input samples?
-    X = np.array(full_dataset.selected_decoder_hidden_states)
-    y = np.array(full_dataset.presence_column)
-
-    regressor.fit(X, y)
-
-    print("f")
-
-    """
-    training_data_loader = DataLoader(
-        dataset=full_dataset,
-        sampler=SubsetRandomSampler(training_indices)
-    )
-    validation_data_loader = DataLoader(
-        dataset=full_dataset,
-        sampler=SubsetRandomSampler(validation_indices)
-    )
-    test_data_loader = DataLoader(
-        dataset=full_dataset,
-        sampler=SubsetRandomSampler(test_indices),
-        batch_size=1
-    )
-
-    # Prepare model for training
-    models = []
 
     for i in range(num_models):
-        print("\nTraining model {}...\n".format(i+1))
-        input_size = full_dataset.hidden_activations_decoder[0][0].size()[2]  # Infer input size
-        model = DiagnosticBinaryClassifier(input_size=input_size)
+        #create a new random split for each model
+        training_indices, validation_indices, test_indices = _split(len(full_dataset), ratio=(0.9, 0.1, 0))
 
-        criterion = nn.BCELoss()  # Binary cross entropy loss
-        optimizer = optim.SGD(model.parameters(), lr=0.005)
-        #optimizer = optim.Adam(model.parameters(), lr=0.05)
+        X = full_dataset.selected_decoder_hidden_states
+        y = full_dataset.presence_column
 
-        # Train
-        train(model, training_data_loader, validation_data_loader, test_data_loader, criterion, optimizer, epochs=epochs)
-        models.append(model)
+        regressor = LogisticRegression()
+        regressor.fit(X[training_indices], y[training_indices])
+        print(regressor.score(X[validation_indices], y[validation_indices]))
 
+    """
     # Plotting
     models_weights = [model.linear.weight.detach().numpy() for model in models]
     # print_correlation_matrix(models_weights)
