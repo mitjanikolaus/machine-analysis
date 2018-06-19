@@ -139,15 +139,11 @@ def run_model_on_test_data(model, data, get_batch_data):
                     if "activations" in activations_name:
                         all_model_activations[activations_name].append(activations)
 
-                # Store inputs and outputs
-                all_input_seqs.append(input_variable)
-                all_model_outputs.append(decoder_outputs)
+        # dataset = ActivationsDataset(all_input_seqs, all_model_outputs, **all_model_activations)
 
-        # dataset = ActivationsDataset(
-        #     all_input_seqs, all_model_outputs,
-        #     encoder_activations=all_encoder_activations,
-        #     decoder_activations=all_decoder_activations
-        # )
+
+        gate_activations = {key: all_model_activations[key] for key in filter(lambda key: 'gate' in key, all_model_activations.keys())}
+        gate_dataset = ActivationsDataset(all_input_seqs, all_model_outputs, **gate_activations)
 
         counter_dataset = CounterDataset(
             all_input_seqs,
@@ -156,7 +152,8 @@ def run_model_on_test_data(model, data, get_batch_data):
             decoder_activations=all_decoder_activations
         )
 
-        return counter_dataset
+
+        return gate_dataset
 
 test_data='../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/heldout_tables.tsv'
 
@@ -193,14 +190,16 @@ for checkpoint, name_model_part in checkpoints:
 
         print('data/{}_{}.pt'.format(name_model_part, name_data_part))
 
-        run_and_get_hidden_activations(
-            checkpoint,
-            dataset,
-            attention_method='mlp',
-            use_attention_loss=True,
-            ignore_output_eos=True,
-            save_path='data/decoder_counter_datasets/{}_{}.pt'.format(name_model_part, name_data_part)
-        )
+        # if 'lstm' in name_model_part.lower():
+        if True:
+            run_and_get_hidden_activations(
+                checkpoint,
+                dataset,
+                attention_method='mlp',
+                use_attention_loss=True,
+                ignore_output_eos=True,
+                save_path='data/gate_datasets/{}_{}.pt'.format(name_model_part, name_data_part)
+            )
 
 
 # checkpoint_path = '../machine-zoo/guided/gru/1/'

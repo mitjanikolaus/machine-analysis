@@ -11,7 +11,7 @@ weights = []
 biases = []
 model_names = []
 
-model_directory = 'results/models/'
+model_directory = 'results_decoder_simple/models/'
 
 for file in os.listdir(model_directory):
     model.load_state_dict(torch.load(model_directory + file))
@@ -28,9 +28,9 @@ for weight, bias, model_name in zip(weights, biases, model_names):
     plt.imshow(
         np.reshape(torch.cat((torch.unsqueeze(bias, dim=0), weight), 1).numpy(), (19, 27)),
         cmap='viridis', interpolation='nearest',
-        # vmax=maximum_value, vmin=minimum_value
+        vmax=maximum_value, vmin=minimum_value
     )
 
-    plt.savefig('results/weight_plots/{}.png'.format(model_name))
+    plt.savefig('results_decoder_simple/weight_plots/{}.png'.format(model_name))
     plt.clf()
 
