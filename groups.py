@@ -36,6 +36,7 @@ def _split(length: int, ratio=(0.9, 0.1)):
 
     return train_indices, test_indices
 
+
 class FunctionalGroupsDataset(ActivationsDataset):
     """
     Data set tailored to identify functional groups of neurons.
@@ -72,7 +73,7 @@ class FunctionalGroupsDataset(ActivationsDataset):
             regressor_presence_column = []
 
             for model_input, decoder_hidden_states in zip(self.model_inputs, getattr(self, target_activations)):
-                occurrence_indices = np.where(model_input.flatten() == 3)[0]
+                occurrence_indices = np.where(model_input.flatten() == target_feature)[0]
 
                 for ts, decoder_hidden_state in enumerate(decoder_hidden_states):
                     # Target feature in input: label 1
