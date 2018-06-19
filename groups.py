@@ -61,7 +61,7 @@ class FunctionalGroupsDataset(ActivationsDataset):
             ))
         )
 
-    def add_target_feature_label(self, target_feature: int, target_activations: str, position_sensitive=-1):
+    def add_target_feature_label(self, target_feature: int, target_activations: str, position_sensitive=-1, inputs_for_regressor=False):
         """
         Add a binary label to every instance in the data set, telling whether a target feature is present in the input
         sequence (and if it is at a specified position given that position_sensitive > -1).
@@ -89,10 +89,17 @@ class FunctionalGroupsDataset(ActivationsDataset):
                     class_label = torch.Tensor([0])
 
                 self.presence_column.append(class_label)
-                self.selected_decoder_hidden_states.append(decoder_hidden_states[occurrence_index])
+                if inputs_for_regressor:
+                    self.selected_decoder_hidden_states.append(decoder_hidden_states[occurrence_index].flatten())
+                else:
+                    self.selected_decoder_hidden_states.append(decoder_hidden_states[occurrence_index])
 
             # Overwrite data using the new class label column
-            self.data = list(zip(self.selected_decoder_hidden_states, self.presence_column))
+            if inputs_for_regressor:
+                self.selected_decoder_hidden_states = np.array(self.selected_decoder_hidden_states)
+                self.presence_column = np.array(self.presence_column)
+            else:
+                self.data = list(zip(self.selected_decoder_hidden_states, self.presence_column))
 
             self.target_feature_label_added = True  # Only allow this logic to be called once
 
@@ -234,8 +241,7 @@ if __name__ == "__main__":
     epochs = 50
     target_feature = 3  # t1 = 3
 
-    full_dataset = FunctionalGroupsDataset.load("./guided_gru_1_train.pt")
-
+    full_dataset = FunctionalGroupsDataset.load("./guided_gru_1_train.pt", convert_to_numpy=True)
 
     train_neurons_subset = [15, 96, 104, 165, 226, 353, 426, 441]
 
@@ -245,18 +251,31 @@ if __name__ == "__main__":
     for sample in full_dataset.hidden_activations_decoder:
         sample_subset = []
         for sample_timestep in sample:
-            sample_subset.append(sample_timestep[:,:,train_neurons_subset])
-        hidden_activations_decoder_subset.append(sample_subset)
+            sample_subset.append(sample_timestep[train_neurons_subset])
+        hidden_activations_decoder_subset.append(np.array(sample_subset))
 
-    full_dataset.hidden_activations_decoder = hidden_activations_decoder_subset
+    #full_dataset.hidden_activations_decoder = hidden_activations_decoder_subset
 
     full_dataset.add_target_feature_label(
-        target_feature=target_feature, target_activations="hidden_activations_decoder", position_sensitive=-1
+        target_feature=target_feature, target_activations="hidden_activations_decoder", position_sensitive=-1, inputs_for_regressor=True
     )
 
 
     training_indices, validation_indices, test_indices = _split(len(full_dataset), ratio=(0.8, 0.1, 0.1))
 
+    from sklearn.linear_model import LogisticRegression
+
+    regressor = LogisticRegression()
+
+    #TODO include all input samples?
+    X = np.array(full_dataset.selected_decoder_hidden_states)
+    y = np.array(full_dataset.presence_column)
+
+    regressor.fit(X, y)
+
+    print("f")
+
+    """
     training_data_loader = DataLoader(
         dataset=full_dataset,
         sampler=SubsetRandomSampler(training_indices)
@@ -280,7 +299,8 @@ if __name__ == "__main__":
         model = DiagnosticBinaryClassifier(input_size=input_size)
 
         criterion = nn.BCELoss()  # Binary cross entropy loss
-        optimizer = optim.SGD(model.parameters(), lr=0.001)
+        optimizer = optim.SGD(model.parameters(), lr=0.005)
+        #optimizer = optim.Adam(model.parameters(), lr=0.05)
 
         # Train
         train(model, training_data_loader, validation_data_loader, test_data_loader, criterion, optimizer, epochs=epochs)
@@ -291,6 +311,7 @@ if __name__ == "__main__":
     # print_correlation_matrix(models_weights)
     # plot_multiple_model_weights(weights_to_plot=models_weights)
     test_neuron_significance(models_weights)
+    """
 
 
 
