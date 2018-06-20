@@ -8,19 +8,12 @@ import math
 from collections import Counter
 
 # EXT
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import DataLoader
-from torch.utils.data.sampler import SubsetRandomSampler
-import torch.optim as optim
-from scipy.stats import pearsonr
 from sklearn.linear_model import LogisticRegression
 import numpy as np
+import matplotlib.pyplot as plt
 
 # PROJECT
 from activations import ActivationsDataset
-from visualization import plot_multiple_model_weights
 
 
 def _split(length: int, ratio=(0.9, 0.1)):
@@ -92,26 +85,94 @@ class FunctionalGroupsDataset(ActivationsDataset):
 
 
 if __name__ == "__main__":
-    num_models = 10
     target_feature = 3  # t1 = 3
 
     # Load data and split into sets
     full_dataset = FunctionalGroupsDataset.load("./guided_gru_1_train.pt", convert_to_numpy=True)
-
     full_dataset.add_dataset_for_regressor(
         target_feature=target_feature, target_activations="hidden_activations_decoder"
     )
 
-    for i in range(num_models):
-        #create a new random split for each model
-        training_indices, test_indices = _split(len(full_dataset), ratio=(0.9, 0.1))
-
-        X = full_dataset.regressor_decoder_hidden_states
-        y = full_dataset.regressor_presence_column
-
+    def train_regressor(X, y, training_indices, test_indices):
         regressor = LogisticRegression()
         regressor.fit(X[training_indices], y[training_indices])
-        print('Accuracy:', regressor.score(X[test_indices], y[test_indices]))
+
+        return regressor.score(X[test_indices], y[test_indices])
+
+
+    #make 50 runs with all units to get stable baseline
+    X = full_dataset.regressor_decoder_hidden_states
+    y = full_dataset.regressor_presence_column
+    baseline_accuracies = []
+    for i in range(50):
+        train_indices, test_indices = _split(len(X), ratio=(0.9, 0.1))
+        accuracy = train_regressor(X, y, train_indices, test_indices)
+        baseline_accuracies.append(accuracy)
+
+    baseline = np.mean(baseline_accuracies)
+    print('Baseline (with all units): ',baseline)
+
+    #get majority classifier baseline
+    majority_baseline = 1 - len(np.where(y == 1)[0]) / len(y)
+    print('Baseline (chance): ', majority_baseline)
+
+    #target accuracy: 95% of baseline (taking into account the majority baseline)
+    target_accuracy = baseline - 0.05*(baseline - majority_baseline)
+    print('Target accuracy: ', target_accuracy)
+
+    num_models = 5
+    #create some train/test splits for testing the units on equal conditions
+    train_test_splits = []
+    for i in range(num_models):
+        train_test_splits.append(_split(len(X), ratio=(0.8, 0.2)))
+
+    #current subset
+    subset_accuracy = 0
+    subset = []
+
+    while subset_accuracy < target_accuracy:
+        unit_accuracies = []
+        for unit in range(full_dataset.regressor_decoder_hidden_states.shape[1]):
+            if not unit in subset:
+                test_subset = subset + [unit]
+                #subset.append(unit)
+                X = full_dataset.regressor_decoder_hidden_states[:,test_subset].reshape(-1,len(test_subset))
+                y = full_dataset.regressor_presence_column
+
+                accuracies_model = []
+                for j in range(num_models):
+                    accuracy = train_regressor(X, y, train_test_splits[j][0], train_test_splits[j][1])
+                    accuracies_model.append(accuracy)
+
+                unit_accuracies.append((unit, np.mean(accuracies_model)))
+
+        unit_accuracies.sort(key=lambda x: x[1], reverse=True)
+        best = unit_accuracies.pop(0)
+        subset.append(best[0])
+        print('units: ', subset, ' accuracy: ', best[1])
+
+
+
+    """
+        subset.append(unit_accuracies.pop(0)[0])
+
+        X = full_dataset.regressor_decoder_hidden_states[:, subset]
+        y = full_dataset.regressor_presence_column
+
+        accuracies_model = []
+        for i in range(num_models):
+            train_indices, test_indices = _split(len(X), ratio=(0.9, 0.1))
+            accuracy = train_regressor(X, y, train_indices, test_indices)
+            accuracies_model.append(accuracy)
+
+        subset_accuracy = np.mean(accuracies_model)
+        print('units: ', subset, ' accuracy: ', subset_accuracy)
+    """
+
+
+
+
+
 
 
 
