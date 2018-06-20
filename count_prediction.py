@@ -157,7 +157,7 @@ reference_mse = 0.0083264094
 
 results = {}
 
-for i in range(512):
+for i in range(10):
 
     model, training_loss, validation_loss = fit_regression(
         data_directory,
@@ -165,7 +165,8 @@ for i in range(512):
         data_file,
         epochs=20,
         leave_out=None,
-        feature_subset=[i]
+        # feature_subset=random.sample(neurons_ordered_by_marginal[15:], 15)
+        feature_subset=neurons_ordered_by_marginal[:15]
     )
 
     print(float(validation_loss))
