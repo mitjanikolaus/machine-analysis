@@ -35,7 +35,7 @@ class FunctionalGroupsDataset(ActivationsDataset):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.target_feature_label_added = False
-        self.regressor_presence_column = []
+        self.regressor_label_column = []
         self.regressor_decoder_hidden_states = []
 
     @staticmethod
@@ -81,13 +81,15 @@ class FunctionalGroupsDataset(ActivationsDataset):
 
             # Overwrite data using the new class label column
             self.regressor_decoder_hidden_states = np.array(regressor_decoder_hidden_states)
-            self.regressor_presence_column = np.array(regressor_class_labels)
+            self.regressor_label_column = np.array(regressor_class_labels)
 
             self.length = 2 * num_positive
 
             self.target_feature_label_added = True  # Only allow this logic to be called once
 
-def perform_ablation_study(activations_dataset_path, target_feature, num_runs=1000, train_test_split=(0.9,0.1), target_accuracy_cut=0.95):
+
+def perform_ablation_study(activations_dataset_path, target_feature, num_runs=1000, train_test_split=(0.9, 0.1),
+                           target_accuracy_cut=0.95):
     """
     Perform an ablation study by stepwise adding units to a subset until target accuracy is reached. The units are
     chosen based on the weights they were assigned in a logistic regressor
@@ -99,7 +101,6 @@ def perform_ablation_study(activations_dataset_path, target_feature, num_runs=10
     :param target_accuracy_cut: accuracy that should be reached to converge (target_accuracy = target_accuracy_cut * baseline_accuracy)
     :return: list denoting the subset of units that are needed to reach the target accuracy
     """
-
     # Load data and split into sets
     full_dataset = FunctionalGroupsDataset.load(activations_dataset_path, convert_to_numpy=True)
     full_dataset.add_dataset_for_regressor(
@@ -114,7 +115,7 @@ def perform_ablation_study(activations_dataset_path, target_feature, num_runs=10
 
     # create input and target for regressor
     X = full_dataset.regressor_decoder_hidden_states
-    y = full_dataset.regressor_presence_column
+    y = full_dataset.regressor_label_column
 
     # create some train/test splits for testing the accuracies on equal conditions
     train_test_splits = []
@@ -153,7 +154,7 @@ def perform_ablation_study(activations_dataset_path, target_feature, num_runs=10
         # add the next unit with highest weight in regressor
         subset.append(baseline_coefs.pop(0)[0])
         X = full_dataset.regressor_decoder_hidden_states[:, subset].reshape(-1, len(subset))
-        y = full_dataset.regressor_presence_column
+        y = full_dataset.regressor_label_column
 
         # perform some runs to get average accuracy
         accuracies_model = []
@@ -169,7 +170,29 @@ def perform_ablation_study(activations_dataset_path, target_feature, num_runs=10
 
     return subset, subset_accuracy
 
+
 if __name__ == "__main__":
+    # Input vocabulary indices (
+    # '<pad>: 1
+    # 011: 10
+    # .: 2
+    # t1: 3
+    # 010: 14
+    # 101: 9
+    # 000: 13
+    # t2: 4
+    # 110: 12
+    # t4: 5
+    # t8: 18
+    # t5: 6
+    # < unk >: 0
+    # t3: 7
+    # 111: 15
+    # 100: 11
+    # 001: 16
+    # t6: 8
+    # t7: 17
+
     target_feature = 3  # t1 = 3
     activations_dataset_path = "./guided_gru_1_all.pt"
 
