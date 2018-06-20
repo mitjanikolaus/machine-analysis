@@ -102,13 +102,13 @@ if __name__ == "__main__":
         regressor = LogisticRegression()
         regressor.fit(X[training_indices], y[training_indices])
 
-        return regressor.score(X[test_indices], y[test_indices])
+        return regressor.score(X[test_indices], y[test_indices]), regressor.coef_
 
 
     X = full_dataset.regressor_decoder_hidden_states
     y = full_dataset.regressor_presence_column
 
-    num_runs = 30
+    num_runs = 100
     # create some train/test splits for testing the units on equal conditions
     train_test_splits = []
     for i in range(num_runs):
@@ -116,9 +116,13 @@ if __name__ == "__main__":
 
     #make runs with all units to get stable baseline
     baseline_accuracies = []
+    baseline_coefs = []
     for i in range(num_runs):
-        accuracy = train_regressor(X, y, train_test_splits[i][0], train_test_splits[i][1])
+        accuracy, coef = train_regressor(X, y, train_test_splits[i][0], train_test_splits[i][1])
         baseline_accuracies.append(accuracy)
+        baseline_coefs.append(coef)
+
+    baseline_coefs = np.mean(baseline_coefs, axis=0).reshape(-1)
 
     baseline = np.mean(baseline_accuracies)
     print('Baseline (with all units): ',baseline)
@@ -135,50 +139,20 @@ if __name__ == "__main__":
     subset_accuracy = 0
     subset = []
 
+    baseline_coefs = list(zip(np.arange(0, 512), baseline_coefs))
+    baseline_coefs.sort(key=lambda x: x[1], reverse=True)
+    print(baseline_coefs)
+
     while subset_accuracy < target_accuracy:
-        unit_accuracies = []
-        for unit in range(full_dataset.regressor_decoder_hidden_states.shape[1]):
-            if not unit in subset:
-                test_subset = subset + [unit]
-                X = full_dataset.regressor_decoder_hidden_states[:,test_subset].reshape(-1,len(test_subset))
-                y = full_dataset.regressor_presence_column
-
-                accuracies_model = []
-                for j in range(num_runs):
-                    accuracy = train_regressor(X, y, train_test_splits[j][0], train_test_splits[j][1])
-                    accuracies_model.append(accuracy)
-
-                unit_accuracies.append((unit, np.mean(accuracies_model)))
-
-        unit_accuracies.sort(key=lambda x: x[1], reverse=True)
-        best = unit_accuracies.pop(0)
-        subset.append(best[0])
-        subset_accuracy = best[1]
-        print('units: ', subset, ' accuracy: ', subset_accuracy)
-
-
-
-    """
-        subset.append(unit_accuracies.pop(0)[0])
-
-        X = full_dataset.regressor_decoder_hidden_states[:, subset]
+        subset.append(baseline_coefs.pop(0)[0])
+        X = full_dataset.regressor_decoder_hidden_states[:,subset].reshape(-1,len(subset))
         y = full_dataset.regressor_presence_column
 
         accuracies_model = []
-        for i in range(num_models):
-            train_indices, test_indices = _split(len(X), ratio=(0.9, 0.1))
-            accuracy = train_regressor(X, y, train_indices, test_indices)
+        for j in range(num_runs):
+            accuracy, _ = train_regressor(X, y, train_test_splits[j][0], train_test_splits[j][1])
             accuracies_model.append(accuracy)
 
         subset_accuracy = np.mean(accuracies_model)
         print('units: ', subset, ' accuracy: ', subset_accuracy)
-    """
-
-
-
-
-
-
-
-
 
