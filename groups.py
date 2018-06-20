@@ -89,11 +89,21 @@ class FunctionalGroupsDataset(ActivationsDataset):
 
             self.target_feature_label_added = True  # Only allow this logic to be called once
 
-if __name__ == "__main__":
-    target_feature = 3  # t1 = 3
+def perform_ablation_study(activations_dataset_path, target_feature, num_runs=1000, train_test_split=(0.9,0.1), target_accuracy_cut=0.95):
+    """
+    Perform an ablation study by stepwise adding units to a subset until target accuracy is reached. The units are
+    chosen based on the weights they were assigned in a logistic regressor
+
+    :param activations_dataset_path: path to dataset of activations
+    :param target_feature: feature that should be predicted
+    :param num_runs: number of runs to be performed to get average accuracies
+    :param train_test_split: tuple denoting percentage of data in training and test set
+    :param target_accuracy_cut: accuracy that should be reached to converge (target_accuracy = target_accuracy_cut * baseline_accuracy)
+    :return: list denoting the subset of units that are needed to reach the target accuracy
+    """
 
     # Load data and split into sets
-    full_dataset = FunctionalGroupsDataset.load("./guided_gru_1_train.pt", convert_to_numpy=True)
+    full_dataset = FunctionalGroupsDataset.load(activations_dataset_path, convert_to_numpy=True)
     full_dataset.add_dataset_for_regressor(
         target_feature=target_feature, target_activations="hidden_activations_decoder"
     )
@@ -104,17 +114,16 @@ if __name__ == "__main__":
 
         return regressor.score(X[test_indices], y[test_indices]), regressor.coef_
 
-
+    # create input and target for regressor
     X = full_dataset.regressor_decoder_hidden_states
     y = full_dataset.regressor_presence_column
 
-    num_runs = 100
-    # create some train/test splits for testing the units on equal conditions
+    # create some train/test splits for testing the accuracies on equal conditions
     train_test_splits = []
     for i in range(num_runs):
-        train_test_splits.append(_split(len(X), ratio=(0.8, 0.2)))
+        train_test_splits.append(_split(len(X), ratio=train_test_split))
 
-    #make runs with all units to get stable baseline
+    # make runs with all units to get stable baseline
     baseline_accuracies = []
     baseline_coefs = []
     for i in range(num_runs):
@@ -122,32 +131,33 @@ if __name__ == "__main__":
         baseline_accuracies.append(accuracy)
         baseline_coefs.append(coef)
 
-    baseline_coefs = np.mean(baseline_coefs, axis=0).reshape(-1)
+    # create average over the regressor coefficients to know which units are important
+    baseline_coefs = np.abs(np.mean(baseline_coefs, axis=0).reshape(-1))
+    baseline_coefs = list(zip(np.arange(0, 512), baseline_coefs))
+    baseline_coefs.sort(key=lambda x: x[1], reverse=True)
 
+    # baseline when using all units
     baseline = np.mean(baseline_accuracies)
-    print('Baseline (with all units): ',baseline)
+    print('Baseline (with all units): ', baseline)
 
-    #get majority classifier baseline
+    # majority classifier baseline
     majority_baseline = 1 - len(np.where(y == 1)[0]) / len(y)
     print('Baseline (chance): ', majority_baseline)
 
-    #target accuracy: 95% of baseline
-    target_accuracy = 0.95*baseline
+    # target accuracy: depending on baseline
+    target_accuracy = target_accuracy_cut * baseline
     print('Target accuracy: ', target_accuracy)
 
-    #current subset
+    # current subset of units to test
     subset_accuracy = 0
     subset = []
-
-    baseline_coefs = list(zip(np.arange(0, 512), baseline_coefs))
-    baseline_coefs.sort(key=lambda x: x[1], reverse=True)
-    print(baseline_coefs)
-
     while subset_accuracy < target_accuracy:
+        # add the next unit with highest weight in regressor
         subset.append(baseline_coefs.pop(0)[0])
-        X = full_dataset.regressor_decoder_hidden_states[:,subset].reshape(-1,len(subset))
+        X = full_dataset.regressor_decoder_hidden_states[:, subset].reshape(-1, len(subset))
         y = full_dataset.regressor_presence_column
 
+        # perform some runs to get average accuracy
         accuracies_model = []
         for j in range(num_runs):
             accuracy, _ = train_regressor(X, y, train_test_splits[j][0], train_test_splits[j][1])
@@ -155,4 +165,18 @@ if __name__ == "__main__":
 
         subset_accuracy = np.mean(accuracies_model)
         print('units: ', subset, ' accuracy: ', subset_accuracy)
+
+    subset.sort()
+    print('units (sorted): ', subset, ' accuracy: ', subset_accuracy)
+
+    return subset, subset_accuracy
+
+if __name__ == "__main__":
+    target_feature = 3  # t1 = 3
+    activations_dataset_path = "./guided_gru_1_all.pt"
+
+    subset, subset_accuracy = perform_ablation_study(activations_dataset_path, target_feature)
+
+
+
 
