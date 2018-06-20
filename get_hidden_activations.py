@@ -120,9 +120,9 @@ def run_model_on_test_data(model, data, get_batch_data):
 
 
 checkpoint_path = '../machine-zoo/guided/gru/1/'
-test_data = '../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/heldout_tables.tsv'
+test_data = '../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/train.tsv'
 
 run_and_get_hidden_activations(
     checkpoint_path, test_data, attention_method='mlp', use_attention_loss=True, ignore_output_eos=True,
-    save_path="./test_activations_gru_1_heldout_tables.pt"
+    save_path="./guided_gru_1_train.pt"
 )
