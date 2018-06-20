@@ -108,7 +108,7 @@ def prepare_test_data(activations_dataset_path, similar_input_criterium, other_i
 
     activation_dataset = ActivationsDataset.load(activations_dataset_path, convert_to_numpy=True)
 
-    for input, activation_data in zip(activation_dataset.model_inputs, getattr(activation_dataset, 'hidden_activations_' + model_part_to_evaluate)):
+    for input, activation_data in zip(activation_dataset.model_inputs, getattr(activation_dataset, model_part_to_evaluate)):
         if similar_input_criterium(input[0]):
             samples_group_similar.append(activation_data)
         if other_input_criterium(input[0]):
@@ -118,11 +118,13 @@ def prepare_test_data(activations_dataset_path, similar_input_criterium, other_i
 
 
 if __name__ == "__main__":
-    models_to_evaluate = [1,2]  # 1,2,3,4,5 (which models from the zoo to take)
+    models_to_evaluate = [1,2,3,4,5]  # 1,2,3,4,5 (which models from the zoo to take)
     print_outliers = True
 
     rnn_type = 'gru' #gru or lstm
-    model_part_to_evaluate = 'decoder'  # encoder or decoder
+
+    #GRU: input_gate_activations_decoder, new_gate_activations_decoder, reset_gate_activations_decoder
+    model_part_to_evaluate = 'reset_gate_activations_decoder' # e.g. hidden_activations_decoder, hidden_activations_encoder
 
     # load a checkpoint to get input vocab
     checkpoint_path = '../machine-zoo/baseline/' + rnn_type + '/' + str(models_to_evaluate[0]) + '/'
@@ -130,7 +132,7 @@ if __name__ == "__main__":
     input_vocab = checkpoint.input_vocab
 
     def similar_input_criterium(sample):
-        return input_vocab.itos[sample[1]] == 't1' #and input_vocab.itos[sample[0]] == '000'# #and sample[2] == 't3'
+        return input_vocab.itos[sample[1]] == 't1' and input_vocab.itos[sample[2]] == 't1' #and input_vocab.itos[sample[0]] == '000'
 
     def other_input_criterium(sample):
         return True #and input_vocab.itos[sample[0]] == '000'
