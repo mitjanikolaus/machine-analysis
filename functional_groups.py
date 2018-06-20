@@ -5,12 +5,10 @@ Train a diagnostic classifier to predict the existence of input sequence element
 # STD
 import random
 import math
-from collections import Counter
 
 # EXT
 from sklearn.linear_model import LogisticRegression
 import numpy as np
-import matplotlib.pyplot as plt
 
 # PROJECT
 from activations import ActivationsDataset
