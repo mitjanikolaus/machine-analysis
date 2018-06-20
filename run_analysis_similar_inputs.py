@@ -8,7 +8,10 @@ from models.analysable_seq2seq import AnalysableSeq2seq
 
 from activations import ActivationsDataset
 
-def run_analysis(rnn_type, similar_input_criterium, other_input_criterium, models_to_evaluate, model_part_to_evaluate, print_outliers=True):
+COMPARE_SAMPLES = 'compare_among_different_samples'
+COMPARE_TIMESTEPS = 'compare_among_different_timesteps'
+
+def run_analysis(rnn_type, similar_input_criterium, other_input_criterium, models_to_evaluate, model_part_to_evaluate, compare, print_outliers=True):
 
     distances_baseline_similar_all_models = []
     distances_baseline_other_all_models = []
@@ -23,7 +26,7 @@ def run_analysis(rnn_type, similar_input_criterium, other_input_criterium, model
 
             samples_group_similar, samples_group_other = prepare_test_data(activations_dataset_path, similar_input_criterium, other_input_criterium, model_part_to_evaluate)
 
-            distances_similar, distances_different = run_models_and_evaluate(samples_group_similar, samples_group_other, print_outliers)
+            distances_similar, distances_different = run_models_and_evaluate(samples_group_similar, samples_group_other, compare, print_outliers)
 
             if(model_type == 'baseline'):
                 distances_baseline_similar_all_models.append(distances_similar)
@@ -38,45 +41,46 @@ def run_analysis(rnn_type, similar_input_criterium, other_input_criterium, model
     distances_guided_other_all_models = np.mean(distances_guided_other_all_models, axis=0)
 
     plt.subplot(2, 1, 1)
+    plt.title('Baseline model')
     plt.plot(np.arange(len(distances_baseline_similar_all_models)), distances_baseline_similar_all_models, label="similar inputs", linestyle='-',
              marker="o")
-    plt.plot(np.arange(len(distances_baseline_other_all_models)), distances_baseline_other_all_models, label="other inputs", linestyle='-',
+    plt.plot(np.arange(len(distances_baseline_other_all_models)), distances_baseline_other_all_models, label="baseline inputs", linestyle='-',
              marker="o")
-    plt.xticks(np.arange(len(distances_baseline_other_all_models), step=1.0))
-    plt.ylabel('Mean distances baseline')
+    if compare == COMPARE_SAMPLES:
+        plt.xticks(np.arange(len(distances_baseline_other_all_models)), ['t={}'.format(i) for i in np.arange(len(distances_baseline_other_all_models))])
+    if compare == COMPARE_TIMESTEPS:
+        plt.xticks(np.arange(len(distances_baseline_other_all_models)), ['t{} -> t{}'.format(i, i+1) for i in np.arange(len(distances_baseline_other_all_models))])
+
+    plt.ylabel('Mean distances')
     plt.legend(loc=2)
 
     plt.subplot(2, 1, 2)
+    plt.title('Guided Attention Model')
     plt.plot(np.arange(len(distances_guided_similar_all_models)), distances_guided_similar_all_models,
              label="similar inputs", linestyle='-',
              marker="o")
     plt.plot(np.arange(len(distances_guided_other_all_models)), distances_guided_other_all_models,
-             label="other inputs", linestyle='-',
+             label="baseline inputs", linestyle='-',
              marker="o")
-    plt.xticks(np.arange(len(distances_guided_other_all_models), step=1.0))
-    plt.ylabel('Mean distances guided')
+    if compare == COMPARE_SAMPLES:
+        plt.xticks(np.arange(len(distances_baseline_other_all_models)), ['t={}'.format(i) for i in np.arange(len(distances_baseline_other_all_models))])
+    if compare == COMPARE_TIMESTEPS:
+        plt.xticks(np.arange(len(distances_baseline_other_all_models)), ['t{} -> t{}'.format(i, i+1) for i in np.arange(len(distances_baseline_other_all_models))])
+
+    plt.ylabel('Mean distances')
     plt.legend(loc=2)
 
     plt.show()
 
-def run_models_and_evaluate(activation_data_similar, activation_data_other, print_outliers=True):
-    # differences across samples
-    def calculate_distances(activation_data):
-        distances = []
-
-        for i, input_sample in enumerate(activation_data):
-            for ts, input_sample_timestep in enumerate(input_sample):
-                if len(distances) <= ts:
-                    distances.append([])
-                for j, input_sample_2 in enumerate(activation_data):
-                    if not j == i:
-                        if len(input_sample_2) >= len(input_sample):
-                            single_distances = (np.square(np.subtract(input_sample_timestep, input_sample_2[ts])))
-                            distances[ts].append(single_distances)
-        return distances
-
-    distances_similar_each_timestep = calculate_distances(activation_data_similar)
-    distances_different_each_timestep = calculate_distances(activation_data_other)
+def run_models_and_evaluate(activation_data_similar, activation_data_other, compare, print_outliers=True):
+    if compare == COMPARE_SAMPLES:
+        distances_similar_each_timestep = calculate_distances_among_samples(activation_data_similar)
+        distances_different_each_timestep = calculate_distances_among_samples(activation_data_other)
+    elif compare == COMPARE_TIMESTEPS:
+        distances_similar_each_timestep = calculate_distances_among_timesteps(activation_data_similar)
+        distances_different_each_timestep = calculate_distances_among_timesteps(activation_data_other)
+    else:
+        raise ValueError("compare must be either COMPARE_TIMESTEPS or COMPARE_SAMPLES")
 
     means_similar_each_timestep = []
     means_different_each_timestep = []
@@ -97,10 +101,29 @@ def run_models_and_evaluate(activation_data_similar, activation_data_other, prin
 
     return means_similar_each_timestep, means_different_each_timestep
 
+def calculate_distances_among_samples(activation_data):
+        distances = []
+        for i, input_sample in enumerate(activation_data):
+            for ts, input_sample_timestep in enumerate(input_sample):
+                if len(distances) <= ts:
+                    distances.append([])
+                for j, input_sample_2 in enumerate(activation_data):
+                    if not j == i:
+                        if len(input_sample_2) >= len(input_sample):
+                            single_distances = (np.square(np.subtract(input_sample_timestep, input_sample_2[ts])))
+                            distances[ts].append(single_distances)
+        return distances
 
-def euclidean_distance(x, y):
-    return np.sqrt(np.sum((x - y) ** 2))
-
+def calculate_distances_among_timesteps(activation_data):
+    distances = []
+    for i, input_sample in enumerate(activation_data):
+        for ts, input_sample_timestep in enumerate(input_sample):
+            if ts < len(input_sample)-1:
+                if len(distances) <= ts:
+                    distances.append([])
+                single_distances = (np.square(np.subtract(input_sample_timestep, input_sample[ts+1])))
+                distances[ts].append(single_distances)
+    return distances
 
 def prepare_test_data(activations_dataset_path, similar_input_criterium, other_input_criterium, model_part_to_evaluate):
     samples_group_similar = []  # all samples that start with t1
@@ -123,8 +146,12 @@ if __name__ == "__main__":
 
     rnn_type = 'gru' #gru or lstm
 
+    #TODO make these static strings
     #GRU: input_gate_activations_decoder, new_gate_activations_decoder, reset_gate_activations_decoder
-    model_part_to_evaluate = 'reset_gate_activations_decoder' # e.g. hidden_activations_decoder, hidden_activations_encoder
+    model_part_to_evaluate = 'hidden_activations_decoder' # e.g. hidden_activations_decoder, hidden_activations_encoder
+
+    # either compare among different samples or compare among different timesteps
+    compare = COMPARE_TIMESTEPS # COMPARE_SAMPLES or COMPARE_TIMESTEPS
 
     # load a checkpoint to get input vocab
     checkpoint_path = '../machine-zoo/baseline/' + rnn_type + '/' + str(models_to_evaluate[0]) + '/'
@@ -132,10 +159,10 @@ if __name__ == "__main__":
     input_vocab = checkpoint.input_vocab
 
     def similar_input_criterium(sample):
-        return input_vocab.itos[sample[1]] == 't1' and input_vocab.itos[sample[2]] == 't1' #and input_vocab.itos[sample[0]] == '000'
+        return input_vocab.itos[sample[1]] == 't2' and input_vocab.itos[sample[2]] == 't2' #and input_vocab.itos[sample[0]] == '000'
 
+    #return just True to get a baseline of all samples
     def other_input_criterium(sample):
-        return True #and input_vocab.itos[sample[0]] == '000'
+        return True
 
-
-    run_analysis(rnn_type, similar_input_criterium, other_input_criterium, models_to_evaluate, model_part_to_evaluate, print_outliers=print_outliers)
+    run_analysis(rnn_type, similar_input_criterium, other_input_criterium, models_to_evaluate, model_part_to_evaluate, compare, print_outliers=print_outliers)
