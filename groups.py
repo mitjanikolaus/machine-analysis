@@ -14,6 +14,7 @@ import shap
 
 # PROJECT
 from activations import ActivationsDataset
+from visualization import plot_multiple_model_weights
 
 
 def _split(length: int, ratio=(0.9, 0.1)):
@@ -89,15 +90,16 @@ class FunctionalGroupsDataset(ActivationsDataset):
             self.target_feature_label_added = True  # Only allow this logic to be called once
 
 
-def get_neuron_shapley_values(regressor, X_train, X_test, k=50, nsamples=100):
+def get_neuron_shapley_values(regressor, X_train, X_test, k=100, nsamples=100):
     summary = shap.kmeans(X_train, k=k)
+    med = np.median(X_train, axis=0).reshape(1, -1)
+    num_features = X_test.shape[1]
     explainer = shap.KernelExplainer(regressor.predict_proba, summary)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         shapley_values = explainer.shap_values(X_test, nsamples=nsamples)
-        shapley_values = shapley_values[0]
-        shapley_values = shapley_values[:, :X_test.shape[1]]
+        shapley_values = shapley_values[0][:, :num_features]
 
     return shapley_values
 
@@ -106,6 +108,7 @@ if __name__ == "__main__":
     num_models = 10
     target_feature = 3  # t1 = 3
     shapley_values = None
+    regressors = []
 
     # Load data and split into sets
     full_dataset = FunctionalGroupsDataset.load("./guided_gru_1_train.pt", convert_to_numpy=True)
@@ -124,6 +127,7 @@ if __name__ == "__main__":
 
         regressor = LogisticRegression()
         regressor.fit(X_train, y_train)
+        regressors.append(regressor)
         print('Accuracy:', regressor.score(X_test, y_test))
 
         # Collect shapley values
@@ -134,8 +138,20 @@ if __name__ == "__main__":
     # Summarize
     summarized_shapley_values = shapley_values.sum(axis=0)
     summarized_shapley_values /= summarized_shapley_values.sum(axis=0)
-    contributing_neurons = np.where[summarized_shapley_values > summarized_shapley_values.mean() + 2 * summarized_shapley_values.std()][0]
+    contributing_neurons = np.where(np.abs(summarized_shapley_values) > summarized_shapley_values.mean() + 2 * summarized_shapley_values.std())[0]
     print(contributing_neurons)
-    a = 3
+    # Zero background model
+    # [ 13  44  92 106 112 178 182 193 250 302 307 321 328 371 382 404 426 436 439 441 444 459 473]
+    # [ 8  13  44  92 106 112 136 151 165 168 178 182 188 202 268 286 302 307 321 328 353 382 404 426 439 441 444 459 466 473 494]
 
+    # Median background model
+    # [ 13  25  59  65 106 151 178 193 211 227 268 273 274 298 302 321 382 405 426 435 436 439 444 450]
+    # [ 13  25  65  72 106 151 176 178 183 193 211 227 298 302 321 353 382 426 436 439 441 444 473]
+
+    # K-means background model
+    # [ 5  11  16  19  25  40  45  49  50  53  66 106 117 135 143 163 191 209 322 331 357 398 416 431 439 472 494 501]
+    # [  3  12  13  14  15  57  63  65  77  78  86 118 120 123 134 146 200 222 232 241 249 268 293 310 385 434 439 443 461 502 507]
+
+    model_weights = [regressor.coef_ for regressor in regressors]
+    plot_multiple_model_weights(model_weights)
 
