@@ -4,14 +4,17 @@ Define different utility functions, e.g. for different kinds of visualization.
 
 # STD
 import re
+from random import sample
+from itertools import chain
 
 # EXT
 import torch
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import cm
-
 from mpl_toolkits.axes_grid1 import AxesGrid
 import numpy as np
+import seaborn as sns
+import pandas as pd
 
 # PROJECT
 from activations import ActivationsDataset
@@ -115,7 +118,8 @@ def plot_activation_distributions(all_timesteps_activations: np.array, grid_size
     plt.show()
 
 
-def plot_activation_distributions_development(show_title=True, name_func=lambda name: name, **samples_all_time_step_activations):
+def plot_activation_distributions_development(show_title=True, name_func=lambda name: name,
+                                              **samples_all_time_step_activations):
     """
     Plot how the distributions of activation values change for multiple samples as a box and whiskers plot.
     """
@@ -151,6 +155,45 @@ def plot_activation_distributions_development(show_title=True, name_func=lambda 
             "Distributions of activation values of {} samples over {} time steps".format(num_samples, num_timesteps)
         )
 
+    plt.show()
+
+
+def contrast_activation_distributions_development(show_title=True, **samples_all_time_step_activations):
+    """
+    Contrast the distribution of activation values over multiple time steps for two models as a violin plot.
+    """
+    assert len(samples_all_time_step_activations) == 2, "Contrasting not possible with more than two models at once"
+
+    # Painstakingly convert the data into a pandas Dataframe, where every single activation value is one row in a big
+    # table and further columns determine the model the value belongs to as well as the time step
+    data = pd.DataFrame(
+        data={
+            "activation": np.concatenate([
+                np.concatenate(data, axis=0)
+                for model, data in samples_all_time_step_activations.items()
+            ], axis=0),
+            "model": np.concatenate([
+                np.array([model] * data.shape[0] * data.shape[1])
+                for model, data in samples_all_time_step_activations.items()
+            ], axis=0),
+            "time_step": np.concatenate([
+                np.concatenate([
+                    np.array([time_step] * data.shape[1]) for time_step in range(data.shape[0])
+                ], axis=0)
+                for model, data in samples_all_time_step_activations.items()
+            ], axis=0),
+        }
+    )
+    sns.violinplot(
+        x="time_step", y="activation", hue="model", data=data, split=True
+    )
+
+    if show_title:
+        plt.title("Distribution of activation values for models {} and {} over {} time steps".format(
+            *samples_all_time_step_activations.keys(), len(samples_all_time_step_activations))
+        )
+
+    plt.legend(loc="lower right")
     plt.show()
 
 
@@ -232,10 +275,10 @@ def rectangularfy(array):
 
 if __name__ == "__main__":
     # Path to activation data sets
-    baseline_lstm_data_path = './baseline_lstm_1_heldout_tables.pt'
-    baseline_gru_data_path = './baseline_gru_1_heldout_tables.pt'
-    ga_lstm_data_path = './ga_lstm_1_heldout_tables.pt'
-    ga_gru_data_path = './ga_gru_1_heldout_tables.pt'
+    baseline_lstm_data_path = './data/baseline_lstm_1_heldout_tables.pt'
+    baseline_gru_data_path = './data/baseline_gru_1_heldout_tables.pt'
+    ga_lstm_data_path = './data/ga_lstm_1_heldout_tables.pt'
+    ga_gru_data_path = './data/ga_gru_1_heldout_tables.pt'
     data_set_paths = [baseline_lstm_data_path, baseline_gru_data_path, ga_lstm_data_path, ga_gru_data_path]
 
     # Load everything
@@ -243,40 +286,37 @@ if __name__ == "__main__":
     baseline_gru_data = ActivationsDataset.load(baseline_gru_data_path, convert_to_numpy=True)
     ga_lstm_data = ActivationsDataset.load(ga_lstm_data_path, convert_to_numpy=True)
     ga_gru_data = ActivationsDataset.load(ga_gru_data_path, convert_to_numpy=True)
-    data_sets = [baseline_lstm_data, baseline_gru_data, ga_lstm_data, ga_gru_data]
+    data_sets = {
+        "baseline_lstm": baseline_lstm_data, "baseline_gru": baseline_gru_data,
+        "guided_attention_lstm": ga_lstm_data, "guided_attention_gru": ga_gru_data
+    }
 
     # Prepare for experiments
-    num_samples = 3
-    target_activations = "forget_gate_activations_encoder"
-    #sample_indices = sample(range(len(baseline_gru_data)), num_samples)
-    sample_indices = [39, 52, 87]
+    num_samples = 1
+    target_activations = "hidden_activations_decoder"
+    sample_indices = sample(range(len(baseline_gru_data)), num_samples)
 
     # Plot activations as heat map
     #encoder_input_length = baseline_lstm_data.model_inputs[0].shape[1]-1
     #plot_activation_distributions(baseline_lstm_data.hidden_activations_encoder[39], show_title=False)
 
     # Plot distribution of activation values in a series of time steps
-    activation_dists_to_plot = {}
-    for path, data_set in zip(data_set_paths, data_sets):
-        average_activations = getattr(data_set, target_activations)[52]
-        activation_dists_to_plot[path] = average_activations
+    # For LSTM baseline and GA model
+    for sample_index in sample_indices:
+        sample_data = {
+            model: getattr(data, target_activations)[sample_index]
+            for model, data in data_sets.items()
+            if "lstm" in model
+        }
 
-    plot_activation_distributions_development(
-        name_func=get_name_from_activation_data_path, show_title=False, **activation_dists_to_plot
-    )
+        contrast_activation_distributions_development(**sample_data, show_title=False)
 
+    # For GRU baseline and GA model
+    for sample_index in sample_indices:
+        sample_data = {
+            model: getattr(data, target_activations)[sample_index]
+            for model, data in data_sets.items()
+            if "gru" in model
+        }
 
-    # Plot changes in activations values
-    #plot_activation_gradients(sample, neuron_heatmap_size=(16, 32))
-    #plot_activation_gradients(
-    #    getattr(ga_lstm_data, target_activations).mean(axis=0), neuron_heatmap_size=(16, 32), show_title=False, absolute=True,
-    #)
-
-    # for model_name, data_set in zip(["baseline_lstm", "baseline_gru", "ga_lstm", "ga_gru"], data_sets):
-    #     for network_name, network_data in zip(["encoder", "decoder"], ["hidden_activations_encoder", "hidden_activations_decoder"]):
-    #         for act_name, target_activations_func in zip(["39", "avg"], [lambda x: x[39], lambda x: x.mean(axis=0)]):
-    #             plot_activation_gradients(
-    #                 target_activations_func(getattr(data_set, network_data)), neuron_heatmap_size=(16, 32),
-    #                 show_title=False, absolute=True,
-    #                 save="./fig/gradients_{}_{}_{}.png".format(model_name, network_name, act_name)
-    #             )
+        contrast_activation_distributions_development(**sample_data, show_title=False)
