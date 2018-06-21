@@ -21,7 +21,7 @@ from activations import ActivationsDataset, CounterDataset
 from models.analysable_decoder import HiddenStateAnalysisDecoderRNN
 from models.analysable_encoder import HiddenStateAnalysisEncoderRNN
 from models.analysable_seq2seq import AnalysableSeq2seq
-
+from models.analysable_cells import AnalysableLSTMCell
 
 def run_and_get_hidden_activations(checkpoint_path, test_data_path, attention_method, use_attention_loss,
                                    ignore_output_eos, max_len=50, save_path=None):
