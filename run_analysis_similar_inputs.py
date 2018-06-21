@@ -88,11 +88,18 @@ def run_models_and_evaluate(activation_data_similar, activation_data_other, comp
         mean_distances_different_per_cell = np.mean(distances_different_each_timestep[ts], axis=0)
 
         if print_outliers:
-            outliers_similar = np.where(mean_distances_similar_per_cell < (np.mean(mean_distances_similar_per_cell) - 2 * np.std(mean_distances_similar_per_cell)))[0]
-            outliers_different = np.where(mean_distances_different_per_cell < (np.mean(mean_distances_different_per_cell) - 2 * np.std(mean_distances_different_per_cell)))[0]
-            relevant_outliers = list(set(outliers_similar) - set(outliers_different))
-            relevant_outliers.sort()
-            print('Relevant outliers timestep', ts, relevant_outliers)
+            outliers_similar_low_change = np.where(mean_distances_similar_per_cell < (np.mean(mean_distances_similar_per_cell) - 2 * np.std(mean_distances_similar_per_cell)))[0]
+            outliers_different_low_change = np.where(mean_distances_different_per_cell < (np.mean(mean_distances_different_per_cell) - 2 * np.std(mean_distances_different_per_cell)))[0]
+            outliers_similar_high_change = np.where(mean_distances_similar_per_cell > (np.mean(mean_distances_similar_per_cell) + 2 * np.std(mean_distances_similar_per_cell)))[0]
+            outliers_different_high_change = np.where(mean_distances_different_per_cell > (np.mean(mean_distances_different_per_cell) + 2 * np.std(mean_distances_different_per_cell)))[0]
+
+            relevant_outliers_low_change = list(set(outliers_similar_low_change) - set(outliers_different_low_change))
+            relevant_outliers_high_change = list(set(outliers_similar_high_change) - set(outliers_different_high_change))
+            relevant_outliers_low_change.sort()
+            relevant_outliers_high_change.sort()
+            print('Relevant outliers timestep', ts, 'low change: ', relevant_outliers_low_change)
+            print('Relevant outliers timestep', ts, 'high change: ', relevant_outliers_high_change)
+
 
         means_similar_each_timestep.append(np.sqrt(np.sum(mean_distances_similar_per_cell)))
         means_different_each_timestep.append(np.sqrt(np.sum(mean_distances_different_per_cell)))
@@ -169,7 +176,7 @@ if __name__ == "__main__":
 
     rnn_type = 'lstm' #gru or lstm
 
-    model_part_to_evaluate = ACTIVATIONS_LSTM_OUTPUT_GATE_DECODER
+    model_part_to_evaluate = ACTIVATIONS_HIDDEN_UNITS_DECODER
 
     # either compare among different samples or compare among different timesteps
     compare = COMPARE_TIMESTEPS # COMPARE_SAMPLES or COMPARE_TIMESTEPS
