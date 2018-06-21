@@ -8,8 +8,6 @@ from models.analysable_seq2seq import AnalysableSeq2seq
 
 from activations import ActivationsDataset
 
-COMPARE_SAMPLES = 'compare_among_different_samples'
-COMPARE_TIMESTEPS = 'compare_among_different_timesteps'
 
 def run_analysis(rnn_type, similar_input_criterium, other_input_criterium, models_to_evaluate, model_part_to_evaluate, compare, print_outliers=True):
 
@@ -139,16 +137,39 @@ def prepare_test_data(activations_dataset_path, similar_input_criterium, other_i
 
     return samples_group_similar, samples_group_other
 
+#Hidden units
+ACTIVATIONS_HIDDEN_UNITS_DECODER = 'hidden_activations_decoder'
+ACTIVATIONS_HIDDEN_UNITS_ENCODER = 'hidden_activations_encoder'
+
+#GRU Gates
+ACTIVATIONS_GRU_INPUT_GATE_DECODER = 'input_gate_activations_decoder'
+ACTIVATIONS_GRU_INPUT_GATE_ENCODER = 'input_gate_activations_encoder'
+ACTIVATIONS_GRU_NEW_GATE_DECODER = 'new_gate_activations_decoder'
+ACTIVATIONS_GRU_NEW_GATE_ENCODER = 'new_gate_activations_encoder'
+ACTIVATIONS_GRU_RESET_GATE_DECODER = 'reset_gate_activations_decoder'
+ACTIVATIONS_GRU_RESET_GATE_ENCODER = 'reset_gate_activations_encoder'
+
+#LSTM Gates
+ACTIVATIONS_LSTM_CELL_GATE_DECODER = 'cell_gate_activations_decoder'
+ACTIVATIONS_LSTM_CELL_GATE_ENCODER = 'cell_gate_activations_encoder'
+ACTIVATIONS_LSTM_INPUT_GATE_DECODER = 'input_gate_activations_decoder'
+ACTIVATIONS_LSTM_INPUT_GATE_ENCODER = 'input_gate_activations_encoder'
+ACTIVATIONS_LSTM_FORGET_GATE_DECODER = 'forget_gate_activations_decoder'
+ACTIVATIONS_LSTM_FORGET_GATE_ENCODER = 'forget_gate_activations_encoder'
+ACTIVATIONS_LSTM_OUTPUT_GATE_DECODER = 'output_gate_activations_decoder'
+ACTIVATIONS_LSTM_OUTPUT_GATE_ENCDODER = 'output_gate_activations_encoder'
+
+COMPARE_SAMPLES = 'compare_among_different_samples'
+COMPARE_TIMESTEPS = 'compare_among_different_timesteps'
+
 
 if __name__ == "__main__":
     models_to_evaluate = [1,2,3,4,5]  # 1,2,3,4,5 (which models from the zoo to take)
     print_outliers = True
 
-    rnn_type = 'gru' #gru or lstm
+    rnn_type = 'lstm' #gru or lstm
 
-    #TODO make these static strings
-    #GRU: input_gate_activations_decoder, new_gate_activations_decoder, reset_gate_activations_decoder
-    model_part_to_evaluate = 'hidden_activations_decoder' # e.g. hidden_activations_decoder, hidden_activations_encoder
+    model_part_to_evaluate = ACTIVATIONS_LSTM_OUTPUT_GATE_DECODER
 
     # either compare among different samples or compare among different timesteps
     compare = COMPARE_TIMESTEPS # COMPARE_SAMPLES or COMPARE_TIMESTEPS
@@ -159,10 +180,10 @@ if __name__ == "__main__":
     input_vocab = checkpoint.input_vocab
 
     def similar_input_criterium(sample):
-        return input_vocab.itos[sample[1]] == 't2' and input_vocab.itos[sample[2]] == 't2' #and input_vocab.itos[sample[0]] == '000'
+        return  input_vocab.itos[sample[1]] == 't2' and input_vocab.itos[sample[2]] == 't2' #input_vocab.itos[sample[0]] == '000'
 
     #return just True to get a baseline of all samples
     def other_input_criterium(sample):
-        return True
+        return True #and input_vocab.itos[sample[0]] == '000'
 
     run_analysis(rnn_type, similar_input_criterium, other_input_criterium, models_to_evaluate, model_part_to_evaluate, compare, print_outliers=print_outliers)
