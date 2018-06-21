@@ -354,12 +354,12 @@ def create_all_violin_plots(data_sets, sample_indices):
                 }
 
                 # Create folder if necessary
-                if not os.path.isdir("./fig/{}_{}".format(column, model_type)):
-                    os.mkdir("./fig/{}_{}".format(column, model_type))
+                if not os.path.isdir("./fig/{}_{}_violins".format(column, model_type)):
+                    os.mkdir("./fig/{}_{}_violins".format(column, model_type))
 
                 # Create plot
                 contrast_activation_distributions_development(
-                    **sample_data, show_title=False, save="./fig/{}_{}/{}.png".format(column, model_type, sample_index)
+                    **sample_data, show_title=False, save="./fig/{}_{}_violins/{}.png".format(column, model_type, sample_index)
                 )
 
 
