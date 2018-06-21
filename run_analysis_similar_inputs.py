@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from models.analysable_seq2seq import AnalysableSeq2seq
 from activations import ActivationsDataset
 
-def run_analysis(rnn_type, similar_input_criterium, other_input_criterium, models_to_evaluate, model_part_to_evaluate, compare, print_outliers=True, legend_location=2):
+def run_analysis(rnn_type, similar_input_criterium, other_input_criterium, models_to_evaluate, model_part_to_evaluate, compare, print_outliers=True, legend_labels=('similar input','other input'), legend_location=2):
 
     distances_baseline_similar_all_models = []
     distances_baseline_other_all_models = []
@@ -38,15 +38,17 @@ def run_analysis(rnn_type, similar_input_criterium, other_input_criterium, model
     width = 0.35  # the width of the bars
     fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, sharex=True)
 
+    plt.suptitle(model_part_to_evaluate)
+
     ax1.set_title('Baseline Model')
 
-    rects1_baseline = ax1.bar(np.arange(len(distances_baseline_similar_all_models)), distances_baseline_similar_all_models, width, color='C1')
-    rects2_baseline = ax1.bar(np.arange(len(distances_baseline_similar_all_models)) + width, distances_baseline_other_all_models, width, color='C2')
-    ax1.set_ylabel('Mean distances')
+    rects1_baseline = ax1.bar(np.arange(len(distances_baseline_similar_all_models)), distances_baseline_similar_all_models, width, color='tab:blue')
+    rects2_baseline = ax1.bar(np.arange(len(distances_baseline_similar_all_models)) + width, distances_baseline_other_all_models, width, color='tab:blue', alpha=0.5)
+    ax1.set_ylabel('Mean distances ')
 
     ax2.set_title('Guided Attention Model')
-    rects1_guided = ax2.bar(np.arange(len(distances_guided_similar_all_models)), distances_guided_similar_all_models, width, color='C1')
-    rects2_guided = ax2.bar(np.arange(len(distances_guided_other_all_models)) + width, distances_guided_other_all_models, width, color='C2')
+    rects1_guided = ax2.bar(np.arange(len(distances_guided_similar_all_models)), distances_guided_similar_all_models, width, color='tab:orange')
+    rects2_guided = ax2.bar(np.arange(len(distances_guided_other_all_models)) + width, distances_guided_other_all_models, width, color='tab:orange', alpha=0.5)
     ax2.set_ylabel('Mean distances')
 
     if compare == COMPARE_SAMPLES:
@@ -55,7 +57,8 @@ def run_analysis(rnn_type, similar_input_criterium, other_input_criterium, model
         ax2.set_xticks(np.arange(len(distances_baseline_other_all_models)) + width / 2)
         ax2.set_xticklabels(['t{} -> t{}'.format(i, i+1) for i in np.arange(len(distances_baseline_other_all_models))])
 
-    ax1.legend((rects1_baseline[0], rects2_baseline[0]), ('Similar','Other'), loc=legend_location)
+    ax1.legend((rects1_baseline[0], rects2_baseline[0]), legend_labels, loc=legend_location)
+    ax2.legend((rects1_guided[0], rects2_guided[0]), legend_labels, loc=legend_location)
 
     plt.show()
 
@@ -160,11 +163,11 @@ COMPARE_TIMESTEPS = 'compare_among_different_timesteps'
 
 if __name__ == "__main__":
     models_to_evaluate = [1,2,3,4,5]  # 1,2,3,4,5 (which models from the zoo to take)
-    print_outliers = True
+    print_outliers = False
 
-    rnn_type = 'lstm' #gru or lstm
+    rnn_type = 'gru' #gru or lstm
 
-    model_part_to_evaluate = ACTIVATIONS_HIDDEN_UNITS_DECODER
+    model_part_to_evaluate = ACTIVATIONS_GRU_RESET_GATE_DECODER
 
     # either compare among different samples or compare among different timesteps
     compare = COMPARE_SAMPLES # COMPARE_SAMPLES or COMPARE_TIMESTEPS
@@ -174,12 +177,15 @@ if __name__ == "__main__":
     checkpoint = AnalysableSeq2seq.load(checkpoint_path)
     input_vocab = checkpoint.input_vocab
 
+    # criterium for filtering inputs
     def similar_input_criterium(sample):
-        return  input_vocab.itos[sample[0]] == '000' and input_vocab.itos[sample[1]] == 't2' #and input_vocab.itos[sample[2]] == 't2' #
+        return input_vocab.itos[sample[1]] == 't1' #and input_vocab.itos[sample[2]] == 't1' #input_vocab.itos[sample[0]] == '000' and
 
-    #return just True to get a baseline of all samples
+    #c riterium for baseline to compare to
     def other_input_criterium(sample):
-        return True and input_vocab.itos[sample[0]] == '000'
+        # return just True to get a baseline of all samples
+        return True #and input_vocab.itos[sample[0]] == '000'
 
-    legend_location = 1
-    run_analysis(rnn_type, similar_input_criterium, other_input_criterium, models_to_evaluate, model_part_to_evaluate, compare, print_outliers=print_outliers, legend_location=legend_location)
+    legend_labels = ('Input: XXX t1 X .','Input: XXX X X .')
+    legend_location = 4
+    run_analysis(rnn_type, similar_input_criterium, other_input_criterium, models_to_evaluate, model_part_to_evaluate, compare, print_outliers=print_outliers, legend_labels=legend_labels, legend_location=legend_location)
