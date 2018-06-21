@@ -5,8 +5,7 @@ Define different utility functions, e.g. for different kinds of visualization.
 # STD
 import re
 from random import sample
-from itertools import chain
-from collections import defaultdict
+import os
 
 # EXT
 import torch
@@ -159,7 +158,7 @@ def plot_activation_distributions_development(show_title=True, name_func=lambda 
     plt.show()
 
 
-def contrast_activation_distributions_development(show_title=True, **samples_all_time_step_activations):
+def contrast_activation_distributions_development(show_title=True, save=None, **samples_all_time_step_activations):
     """
     Contrast the distribution of activation values over multiple time steps for two models as a violin plot.
     """
@@ -185,6 +184,8 @@ def contrast_activation_distributions_development(show_title=True, **samples_all
             ], axis=0),
         }
     )
+
+    plt.figure()
     sns.violinplot(
         x="time_step", y="activation", hue="model", data=data, split=True
     )
@@ -196,7 +197,12 @@ def contrast_activation_distributions_development(show_title=True, **samples_all
 
     plt.tight_layout()
     plt.legend(loc="lower right")
-    plt.show()
+
+    if save is None:
+        plt.show()
+    else:
+        plt.savefig(save, bbox_inches="tight")
+        plt.close()
 
 
 def plot_activation_gradients(all_timesteps_activations: np.array, neuron_heatmap_size: tuple, show_title=True,
@@ -242,6 +248,7 @@ def plot_activation_gradients(all_timesteps_activations: np.array, neuron_heatma
         plt.show()
     else:
         plt.savefig(save, bbox_inches="tight")
+        plt.close()
 
 
 def plot_neuron_activity(activations, num_neuron_samples: int, mode="lv"):
@@ -329,6 +336,33 @@ def rectangularfy(array):
     return array
 
 
+def create_all_violin_plots(data_sets, sample_indices):
+    """
+    Create all the violin plots for a number of given samples for all the different kinds of activations and model
+    architectures like LSTM and GRU between a baseline and a guided attention model.
+    """
+    for model_type in ("lstm", "gru"):
+        # Only get lstm or gru models
+        relevant_data_sets = [data for model, data in data_sets.items() if model_type in model]
+
+        for column in relevant_data_sets[0].activation_columns:
+            for sample_index in sample_indices:
+                sample_data = {
+                    model: getattr(data, column)[sample_index]
+                    for model, data in data_sets.items()
+                    if model_type in model
+                }
+
+                # Create folder if necessary
+                if not os.path.isdir("./fig/{}_{}".format(column, model_type)):
+                    os.mkdir("./fig/{}_{}".format(column, model_type))
+
+                # Create plot
+                contrast_activation_distributions_development(
+                    **sample_data, show_title=False, save="./fig/{}_{}/{}.png".format(column, model_type, sample_index)
+                )
+
+
 if __name__ == "__main__":
     # Path to activation data sets
     baseline_lstm_data_path = './data/baseline_lstm_1_heldout_tables.pt'
@@ -348,34 +382,17 @@ if __name__ == "__main__":
     }
 
     # Prepare for experiments
-    num_samples = 5
+    num_samples = 10
     target_activations = "hidden_activations_decoder"
-    sample_indices = sample(range(len(baseline_gru_data)), num_samples)
+    #sample_indices = sample(range(len(baseline_gru_data)), num_samples)
+    sample_indices = [113, 85, 49, 87, 21, 91, 137, 80, 18, 63]
 
     # Plot activations as heat map
     #encoder_input_length = baseline_lstm_data.model_inputs[0].shape[1]-1
     #plot_activation_distributions(baseline_lstm_data.hidden_activations_encoder[39], show_title=False)
 
-    # # Plot distribution of activation values in a series of time steps
-    # # For LSTM baseline and GA model
-    # for sample_index in sample_indices:
-    #     sample_data = {
-    #         model: getattr(data, target_activations)[sample_index]
-    #         for model, data in data_sets.items()
-    #         if "lstm" in model
-    #     }
-    #
-    #     contrast_activation_distributions_development(**sample_data, show_title=False)
-    #
-    # # For GRU baseline and GA model
-    # for sample_index in sample_indices:
-    #     sample_data = {
-    #         model: getattr(data, target_activations)[sample_index]
-    #         for model, data in data_sets.items()
-    #         if "gru" in model
-    #     }
-    #
-    #     contrast_activation_distributions_development(**sample_data, show_title=False)
+    # Plot distribution of activation values in a series of time steps
+    create_all_violin_plots(data_sets, sample_indices)
 
     # Plot neuron activity for some sample neurons
-    plot_neuron_activity(getattr(ga_lstm_data, target_activations), num_neuron_samples=50, mode="boxes")
+    # plot_neuron_activity(getattr(ga_lstm_data, target_activations), num_neuron_samples=50, mode="boxes")
