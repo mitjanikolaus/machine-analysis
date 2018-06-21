@@ -6,6 +6,7 @@ Define different utility functions, e.g. for different kinds of visualization.
 import re
 from random import sample
 from itertools import chain
+from collections import defaultdict
 
 # EXT
 import torch
@@ -193,6 +194,7 @@ def contrast_activation_distributions_development(show_title=True, **samples_all
             *samples_all_time_step_activations.keys(), len(samples_all_time_step_activations))
         )
 
+    plt.tight_layout()
     plt.legend(loc="lower right")
     plt.show()
 
@@ -240,6 +242,60 @@ def plot_activation_gradients(all_timesteps_activations: np.array, neuron_heatma
         plt.show()
     else:
         plt.savefig(save, bbox_inches="tight")
+
+
+def plot_neuron_activity(activations, num_neuron_samples: int, mode="lv"):
+    """
+    Plot the activation values for a certain number of randomly sampled neurons over all samples.
+    """
+    assert mode in ("lv", "boxes"), "Mode has to be either 'lv' or 'boxes, '{}' found.".format(mode)
+
+    num_neurons = activations[0].shape[1]
+    sampled_neurons = sample(range(num_neurons), k=num_neuron_samples)
+
+    activations_per_neuron = np.empty((num_neuron_samples, 0))
+
+    # Aggregate activations for sample neurons
+    for data_point in activations:
+        for time_step in data_point:
+            current_neuron_activations = time_step[sampled_neurons].reshape(-1, 1)
+            activations_per_neuron = np.concatenate((activations_per_neuron, current_neuron_activations), axis=1)
+
+    # Create LV plot
+    if mode == "lv":
+        # Create pandas data frame object
+        rows, columns = activations_per_neuron.shape
+        data = pd.DataFrame(
+            data={
+                "activation": activations_per_neuron.reshape(rows * columns, ),
+                "neuron": np.concatenate([
+                    np.array([neuron_index] * columns) for neuron_index in range(1, rows + 1)
+                ], axis=0)
+            }
+        )
+
+        # Visualize using Letter value plot
+        ax = sns.lvplot(
+            x="neuron", y="activation", scale="linear", data=data, width=1,
+            palette=sns.color_palette("viridis", n_colors=num_neuron_samples)
+        )
+
+    # Create box and whiskers plot
+    elif mode == "boxes":
+        fig, axis = plt.subplots(1, 1)
+        ax = axis
+
+        bplot = ax.boxplot([
+            activations_per_neuron[i] for i in range(num_neuron_samples)
+        ], vert=True, sym="", patch_artist=True, whis=10000, notch=True, manage_xticks=False)
+        # Show min and max by setting whis very high
+
+        # Coloring
+        for patch in bplot["boxes"]:
+            patch.set_facecolor("tab:blue")
+
+    ax.set_xticks([i for i in range(1, num_neuron_samples + 1, int(num_neuron_samples / 10))])
+    plt.show()
 
 
 def get_name_from_activation_data_path(path):
@@ -292,7 +348,7 @@ if __name__ == "__main__":
     }
 
     # Prepare for experiments
-    num_samples = 1
+    num_samples = 5
     target_activations = "hidden_activations_decoder"
     sample_indices = sample(range(len(baseline_gru_data)), num_samples)
 
@@ -300,23 +356,26 @@ if __name__ == "__main__":
     #encoder_input_length = baseline_lstm_data.model_inputs[0].shape[1]-1
     #plot_activation_distributions(baseline_lstm_data.hidden_activations_encoder[39], show_title=False)
 
-    # Plot distribution of activation values in a series of time steps
-    # For LSTM baseline and GA model
-    for sample_index in sample_indices:
-        sample_data = {
-            model: getattr(data, target_activations)[sample_index]
-            for model, data in data_sets.items()
-            if "lstm" in model
-        }
+    # # Plot distribution of activation values in a series of time steps
+    # # For LSTM baseline and GA model
+    # for sample_index in sample_indices:
+    #     sample_data = {
+    #         model: getattr(data, target_activations)[sample_index]
+    #         for model, data in data_sets.items()
+    #         if "lstm" in model
+    #     }
+    #
+    #     contrast_activation_distributions_development(**sample_data, show_title=False)
+    #
+    # # For GRU baseline and GA model
+    # for sample_index in sample_indices:
+    #     sample_data = {
+    #         model: getattr(data, target_activations)[sample_index]
+    #         for model, data in data_sets.items()
+    #         if "gru" in model
+    #     }
+    #
+    #     contrast_activation_distributions_development(**sample_data, show_title=False)
 
-        contrast_activation_distributions_development(**sample_data, show_title=False)
-
-    # For GRU baseline and GA model
-    for sample_index in sample_indices:
-        sample_data = {
-            model: getattr(data, target_activations)[sample_index]
-            for model, data in data_sets.items()
-            if "gru" in model
-        }
-
-        contrast_activation_distributions_development(**sample_data, show_title=False)
+    # Plot neuron activity for some sample neurons
+    plot_neuron_activity(getattr(ga_lstm_data, target_activations), num_neuron_samples=50, mode="boxes")
