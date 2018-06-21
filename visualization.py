@@ -19,6 +19,10 @@ import pandas as pd
 # PROJECT
 from activations import ActivationsDataset
 
+# CONST
+BASELINE_COLOR = "tab:blue"
+GA_COLOR = "tab:orange"
+
 
 def plot_hidden_activations(activations, input_length, num_units_to_plot=50):
     """
@@ -163,6 +167,7 @@ def contrast_activation_distributions_development(show_title=True, save=None, **
     Contrast the distribution of activation values over multiple time steps for two models as a violin plot.
     """
     assert len(samples_all_time_step_activations) == 2, "Contrasting not possible with more than two models at once"
+    models = list(samples_all_time_step_activations.keys())
 
     # Painstakingly convert the data into a pandas Dataframe, where every single activation value is one row in a big
     # table and further columns determine the model the value belongs to as well as the time step
@@ -187,7 +192,8 @@ def contrast_activation_distributions_development(show_title=True, save=None, **
 
     plt.figure()
     sns.violinplot(
-        x="time_step", y="activation", hue="model", data=data, split=True
+        x="time_step", y="activation", hue="model", data=data, split=True,
+        palette={models[0]: BASELINE_COLOR, models[1]: GA_COLOR}
     )
 
     if show_title:
@@ -251,14 +257,17 @@ def plot_activation_gradients(all_timesteps_activations: np.array, neuron_heatma
         plt.close()
 
 
-def plot_neuron_activity(activations, num_neuron_samples: int, mode="lv"):
+def plot_neuron_activity(activations, num_neuron_samples: int, mode="lv", color=None, neuron_samples=None, save=None):
     """
     Plot the activation values for a certain number of randomly sampled neurons over all samples.
     """
     assert mode in ("lv", "boxes"), "Mode has to be either 'lv' or 'boxes, '{}' found.".format(mode)
 
     num_neurons = activations[0].shape[1]
-    sampled_neurons = sample(range(num_neurons), k=num_neuron_samples)
+
+    sampled_neurons = neuron_samples
+    if neuron_samples is None:
+        sampled_neurons = sample(range(num_neurons), k=num_neuron_samples)
 
     activations_per_neuron = np.empty((num_neuron_samples, 0))
 
@@ -292,17 +301,31 @@ def plot_neuron_activity(activations, num_neuron_samples: int, mode="lv"):
         fig, axis = plt.subplots(1, 1)
         ax = axis
 
+        # Sort neurons by variance and mean for better readability
+        def _box_size(data):
+            q1, med, q3 = np.percentile(data, [25, 50, 75])
+            return np.abs(q1 - med) + np.abs(q3 - med)
+
+        activations_per_neuron = np.array_split(activations_per_neuron, num_neuron_samples, axis=0)
+        activations_per_neuron = sorted(activations_per_neuron, key=lambda x: _box_size(x))
+
         bplot = ax.boxplot([
-            activations_per_neuron[i] for i in range(num_neuron_samples)
+            activations_per_neuron[i].squeeze() for i in range(num_neuron_samples)
         ], vert=True, sym="", patch_artist=True, whis=10000, notch=True, manage_xticks=False)
         # Show min and max by setting whis very high
 
         # Coloring
         for patch in bplot["boxes"]:
-            patch.set_facecolor("tab:blue")
+            color = "tab:blue" if color is None else color
+            patch.set_facecolor(color)
 
     ax.set_xticks([i for i in range(1, num_neuron_samples + 1, int(num_neuron_samples / 10))])
-    plt.show()
+
+    if save is None:
+        plt.show()
+    else:
+        plt.savefig(save, bbox_inches="tight")
+        plt.close()
 
 
 def get_name_from_activation_data_path(path):
@@ -363,12 +386,32 @@ def create_all_violin_plots(data_sets, sample_indices):
                 )
 
 
+def create_all_neuron_activity_plots(data_sets, sampled_neurons):
+    """
+    Create box plots showing the distribution of activation values per neuron over all samples for both baseline and
+    guided attention model over all kinds of activations.
+    """
+    # Create folder if necessary
+    if not os.path.isdir("./fig/neuron_activities"):
+        os.mkdir("./fig/neuron_activities")
+
+    for model_name, data_set in data_sets.items():
+        plot_color = BASELINE_COLOR if "baseline" in model_name else GA_COLOR
+
+        for activations in data_set.activation_columns:
+            plot_neuron_activity(
+                activations=getattr(data_set, activations), num_neuron_samples=len(sampled_neurons),
+                neuron_samples=sampled_neurons, color=plot_color, mode="boxes",
+                save="./fig/neuron_activities/{}_{}_{}neurons.png".format(model_name, activations, len(sampled_neurons))
+            )
+
+
 if __name__ == "__main__":
     # Path to activation data sets
-    baseline_lstm_data_path = './data/baseline_lstm_1_heldout_tables.pt'
-    baseline_gru_data_path = './data/baseline_gru_1_heldout_tables.pt'
-    ga_lstm_data_path = './data/ga_lstm_1_heldout_tables.pt'
-    ga_gru_data_path = './data/ga_gru_1_heldout_tables.pt'
+    baseline_lstm_data_path = './data/baseline_lstm_1_all.pt'
+    baseline_gru_data_path = './data/baseline_gru_1_all.pt'
+    ga_lstm_data_path = './data/guided_lstm_1_all.pt'
+    ga_gru_data_path = './data/guided_gru_1_all.pt'
     data_set_paths = [baseline_lstm_data_path, baseline_gru_data_path, ga_lstm_data_path, ga_gru_data_path]
 
     # Load everything
@@ -385,14 +428,16 @@ if __name__ == "__main__":
     num_samples = 10
     target_activations = "hidden_activations_decoder"
     #sample_indices = sample(range(len(baseline_gru_data)), num_samples)
-    sample_indices = [113, 85, 49, 87, 21, 91, 137, 80, 18, 63]
-
-    # Plot activations as heat map
-    #encoder_input_length = baseline_lstm_data.model_inputs[0].shape[1]-1
-    #plot_activation_distributions(baseline_lstm_data.hidden_activations_encoder[39], show_title=False)
+    sample_indices = [113, 85, 49, 87, 21, 91, 137, 80, 18, 63]  # Sample once, then use the same ones for consistency
 
     # Plot distribution of activation values in a series of time steps
     create_all_violin_plots(data_sets, sample_indices)
 
     # Plot neuron activity for some sample neurons
-    # plot_neuron_activity(getattr(ga_lstm_data, target_activations), num_neuron_samples=50, mode="boxes")
+    num_neurons = 512
+    num_sample_neurons = 50
+    #sampled_neurons = sample(range(num_neurons), k=num_sample_neurons)
+    sampled_neurons = [92, 19, 94, 338, 52, 444, 145, 57, 496, 50, 91, 267, 139, 179, 159, 359, 74, 58, 113, 293, 175,
+                       308, 105, 75, 224, 316, 435, 142, 67, 364, 173, 286, 511, 148, 394, 460, 8, 348, 463, 389, 180,
+                       125, 339, 155, 391, 467, 188, 333, 478, 349]
+    create_all_neuron_activity_plots(data_sets, sampled_neurons)
