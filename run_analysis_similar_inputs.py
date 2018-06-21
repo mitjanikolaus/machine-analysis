@@ -2,14 +2,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-import torchtext
-
 from models.analysable_seq2seq import AnalysableSeq2seq
-
 from activations import ActivationsDataset
 
-
-def run_analysis(rnn_type, similar_input_criterium, other_input_criterium, models_to_evaluate, model_part_to_evaluate, compare, print_outliers=True):
+def run_analysis(rnn_type, similar_input_criterium, other_input_criterium, models_to_evaluate, model_part_to_evaluate, compare, print_outliers=True, legend_location=2):
 
     distances_baseline_similar_all_models = []
     distances_baseline_other_all_models = []
@@ -38,35 +34,28 @@ def run_analysis(rnn_type, similar_input_criterium, other_input_criterium, model
     distances_guided_similar_all_models = np.mean(distances_guided_similar_all_models, axis=0)
     distances_guided_other_all_models = np.mean(distances_guided_other_all_models, axis=0)
 
-    plt.subplot(2, 1, 1)
-    plt.title('Baseline model')
-    plt.plot(np.arange(len(distances_baseline_similar_all_models)), distances_baseline_similar_all_models, label="similar inputs", linestyle='-',
-             marker="o")
-    plt.plot(np.arange(len(distances_baseline_other_all_models)), distances_baseline_other_all_models, label="baseline inputs", linestyle='-',
-             marker="o")
+    #TODO: add stderr?
+    width = 0.35  # the width of the bars
+    fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, sharex=True)
+
+    ax1.set_title('Baseline Model')
+
+    rects1_baseline = ax1.bar(np.arange(len(distances_baseline_similar_all_models)), distances_baseline_similar_all_models, width, color='C1')
+    rects2_baseline = ax1.bar(np.arange(len(distances_baseline_similar_all_models)) + width, distances_baseline_other_all_models, width, color='C2')
+    ax1.set_ylabel('Mean distances')
+
+    ax2.set_title('Guided Attention Model')
+    rects1_guided = ax2.bar(np.arange(len(distances_guided_similar_all_models)), distances_guided_similar_all_models, width, color='C1')
+    rects2_guided = ax2.bar(np.arange(len(distances_guided_other_all_models)) + width, distances_guided_other_all_models, width, color='C2')
+    ax2.set_ylabel('Mean distances')
+
     if compare == COMPARE_SAMPLES:
-        plt.xticks(np.arange(len(distances_baseline_other_all_models)), ['t={}'.format(i) for i in np.arange(len(distances_baseline_other_all_models))])
+        plt.xticks(np.arange(len(distances_baseline_other_all_models)) + width / 2, ['t={}'.format(i) for i in np.arange(len(distances_baseline_other_all_models))])
     if compare == COMPARE_TIMESTEPS:
-        plt.xticks(np.arange(len(distances_baseline_other_all_models)), ['t{} -> t{}'.format(i, i+1) for i in np.arange(len(distances_baseline_other_all_models))])
+        ax2.set_xticks(np.arange(len(distances_baseline_other_all_models)) + width / 2)
+        ax2.set_xticklabels(['t{} -> t{}'.format(i, i+1) for i in np.arange(len(distances_baseline_other_all_models))])
 
-    plt.ylabel('Mean distances')
-    plt.legend(loc=2)
-
-    plt.subplot(2, 1, 2)
-    plt.title('Guided Attention Model')
-    plt.plot(np.arange(len(distances_guided_similar_all_models)), distances_guided_similar_all_models,
-             label="similar inputs", linestyle='-',
-             marker="o")
-    plt.plot(np.arange(len(distances_guided_other_all_models)), distances_guided_other_all_models,
-             label="baseline inputs", linestyle='-',
-             marker="o")
-    if compare == COMPARE_SAMPLES:
-        plt.xticks(np.arange(len(distances_baseline_other_all_models)), ['t={}'.format(i) for i in np.arange(len(distances_baseline_other_all_models))])
-    if compare == COMPARE_TIMESTEPS:
-        plt.xticks(np.arange(len(distances_baseline_other_all_models)), ['t{} -> t{}'.format(i, i+1) for i in np.arange(len(distances_baseline_other_all_models))])
-
-    plt.ylabel('Mean distances')
-    plt.legend(loc=2)
+    ax1.legend((rects1_baseline[0], rects2_baseline[0]), ('Similar','Other'), loc=legend_location)
 
     plt.show()
 
@@ -99,7 +88,6 @@ def run_models_and_evaluate(activation_data_similar, activation_data_other, comp
             relevant_outliers_high_change.sort()
             print('Relevant outliers timestep', ts, 'low change: ', relevant_outliers_low_change)
             print('Relevant outliers timestep', ts, 'high change: ', relevant_outliers_high_change)
-
 
         means_similar_each_timestep.append(np.sqrt(np.sum(mean_distances_similar_per_cell)))
         means_different_each_timestep.append(np.sqrt(np.sum(mean_distances_different_per_cell)))
@@ -179,7 +167,7 @@ if __name__ == "__main__":
     model_part_to_evaluate = ACTIVATIONS_HIDDEN_UNITS_DECODER
 
     # either compare among different samples or compare among different timesteps
-    compare = COMPARE_TIMESTEPS # COMPARE_SAMPLES or COMPARE_TIMESTEPS
+    compare = COMPARE_SAMPLES # COMPARE_SAMPLES or COMPARE_TIMESTEPS
 
     # load a checkpoint to get input vocab
     checkpoint_path = '../machine-zoo/baseline/' + rnn_type + '/' + str(models_to_evaluate[0]) + '/'
@@ -187,10 +175,11 @@ if __name__ == "__main__":
     input_vocab = checkpoint.input_vocab
 
     def similar_input_criterium(sample):
-        return  input_vocab.itos[sample[1]] == 't2' and input_vocab.itos[sample[2]] == 't2' #input_vocab.itos[sample[0]] == '000'
+        return  input_vocab.itos[sample[0]] == '000' and input_vocab.itos[sample[1]] == 't2' #and input_vocab.itos[sample[2]] == 't2' #
 
     #return just True to get a baseline of all samples
     def other_input_criterium(sample):
-        return True #and input_vocab.itos[sample[0]] == '000'
+        return True and input_vocab.itos[sample[0]] == '000'
 
-    run_analysis(rnn_type, similar_input_criterium, other_input_criterium, models_to_evaluate, model_part_to_evaluate, compare, print_outliers=print_outliers)
+    legend_location = 1
+    run_analysis(rnn_type, similar_input_criterium, other_input_criterium, models_to_evaluate, model_part_to_evaluate, compare, print_outliers=print_outliers, legend_location=legend_location)
