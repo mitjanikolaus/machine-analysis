@@ -79,10 +79,10 @@ def run_and_get_hidden_activations(checkpoint_path, test_data_path, attention_me
 
     data_func = SupervisedTrainer.get_batch_data
 
-    dataset = run_model_on_test_data(model=seq2seq, data=test, get_batch_data=data_func)
+    activations_dataset = run_model_on_test_data(model=seq2seq, data=test, get_batch_data=data_func)
 
     if save_path is not None:
-        dataset.save(save_path)
+        activations_dataset.save(save_path)
 
 
 def run_model_on_test_data(model, data, get_batch_data):
@@ -155,7 +155,7 @@ def run_model_on_test_data(model, data, get_batch_data):
 
         return gate_dataset
 
-test_data='../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/heldout_tables.tsv'
+test_data = '../machine-tasks/LookupTablesIgnoreEOS/lookup-3bit/samples/sample1/heldout_tables.tsv'
 
 cell_types = ['gru', 'lstm']
 model_types = ['guided', 'baseline']
