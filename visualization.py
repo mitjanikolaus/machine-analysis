@@ -18,6 +18,7 @@ import pandas as pd
 
 # PROJECT
 from activations import ActivationsDataset
+from models.analysable_seq2seq import AnalysableSeq2seq
 
 # CONST
 BASELINE_COLOR = "tab:blue"
@@ -162,7 +163,8 @@ def plot_activation_distributions_development(show_title=True, name_func=lambda 
     plt.show()
 
 
-def contrast_activation_distributions_development(show_title=True, save=None, **samples_all_time_step_activations):
+def contrast_activation_distributions_development(show_title=True, save=None, subtitle=None,
+                                                  **samples_all_time_step_activations):
     """
     Contrast the distribution of activation values over multiple time steps for two models as a violin plot.
     """
@@ -203,6 +205,10 @@ def contrast_activation_distributions_development(show_title=True, save=None, **
 
     plt.tight_layout()
     plt.legend(loc="lower right")
+
+    # Add subtitle if given
+    if subtitle:
+        plt.figtext(0.14, 0.15, subtitle, fontsize=12, ha='left')
 
     if save is None:
         plt.show()
@@ -359,7 +365,7 @@ def rectangularfy(array):
     return array
 
 
-def create_all_violin_plots(data_sets, sample_indices):
+def create_all_violin_plots(data_sets, sample_indices, input_vocab=None):
     """
     Create all the violin plots for a number of given samples for all the different kinds of activations and model
     architectures like LSTM and GRU between a baseline and a guided attention model.
@@ -376,13 +382,21 @@ def create_all_violin_plots(data_sets, sample_indices):
                     if model_type in model
                 }
 
+                # Create subtitle if input vocab is given
+                subtitle = None
+                if input_vocab:
+                    input_indices = list(data_sets.values())[0].model_inputs[sample_index].squeeze()
+                    input_seq = [input_vocab.itos[index] for index in list(input_indices)]
+                    subtitle = "Input sequence: " + " ".join(input_seq)
+
                 # Create folder if necessary
                 if not os.path.isdir("./fig/{}_{}_violins".format(column, model_type)):
                     os.mkdir("./fig/{}_{}_violins".format(column, model_type))
 
                 # Create plot
                 contrast_activation_distributions_development(
-                    **sample_data, show_title=False, save="./fig/{}_{}_violins/{}.png".format(column, model_type, sample_index)
+                    **sample_data, show_title=False, subtitle=subtitle,
+                    save="./fig/{}_{}_violins/{}.png".format(column, model_type, sample_index)
                 )
 
 
@@ -408,6 +422,7 @@ def create_all_neuron_activity_plots(data_sets, sampled_neurons):
 
 if __name__ == "__main__":
     # Path to activation data sets
+    checkpoint_path = '../machine-zoo/guided/gru/1/'
     baseline_lstm_data_path = './data/baseline_lstm_1_all.pt'
     baseline_gru_data_path = './data/baseline_gru_1_all.pt'
     ga_lstm_data_path = './data/guided_lstm_1_all.pt'
@@ -424,6 +439,11 @@ if __name__ == "__main__":
         "guided_attention_lstm": ga_lstm_data, "guided_attention_gru": ga_gru_data
     }
 
+    # Load input vocabulary
+    checkpoint = AnalysableSeq2seq.load(checkpoint_path)
+    input_vocab = checkpoint.input_vocab
+    del checkpoint
+
     # Prepare for experiments
     num_samples = 10
     target_activations = "hidden_activations_decoder"
@@ -431,7 +451,7 @@ if __name__ == "__main__":
     sample_indices = [113, 85, 49, 87, 21, 91, 137, 80, 18, 63]  # Sample once, then use the same ones for consistency
 
     # Plot distribution of activation values in a series of time steps
-    create_all_violin_plots(data_sets, sample_indices)
+    create_all_violin_plots(data_sets, sample_indices, input_vocab=input_vocab)
 
     # Plot neuron activity for some sample neurons
     num_neurons = 512
@@ -440,4 +460,4 @@ if __name__ == "__main__":
     sampled_neurons = [92, 19, 94, 338, 52, 444, 145, 57, 496, 50, 91, 267, 139, 179, 159, 359, 74, 58, 113, 293, 175,
                        308, 105, 75, 224, 316, 435, 142, 67, 364, 173, 286, 511, 148, 394, 460, 8, 348, 463, 389, 180,
                        125, 339, 155, 391, 467, 188, 333, 478, 349]
-    create_all_neuron_activity_plots(data_sets, sampled_neurons)
+    #create_all_neuron_activity_plots(data_sets, sampled_neurons)
