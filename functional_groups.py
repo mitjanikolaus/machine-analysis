@@ -177,6 +177,27 @@ def perform_ablation_study(activations_dataset_path, target_feature, target_posi
 
     return subset, subset_accuracy
 
+#Hidden units
+ACTIVATIONS_HIDDEN_UNITS_DECODER = 'hidden_activations_decoder'
+ACTIVATIONS_HIDDEN_UNITS_ENCODER = 'hidden_activations_encoder'
+
+#GRU Gates
+ACTIVATIONS_GRU_INPUT_GATE_DECODER = 'input_gate_activations_decoder'
+ACTIVATIONS_GRU_INPUT_GATE_ENCODER = 'input_gate_activations_encoder'
+ACTIVATIONS_GRU_NEW_GATE_DECODER = 'new_gate_activations_decoder'
+ACTIVATIONS_GRU_NEW_GATE_ENCODER = 'new_gate_activations_encoder'
+ACTIVATIONS_GRU_RESET_GATE_DECODER = 'reset_gate_activations_decoder'
+ACTIVATIONS_GRU_RESET_GATE_ENCODER = 'reset_gate_activations_encoder'
+
+#LSTM Gates
+ACTIVATIONS_LSTM_CELL_GATE_DECODER = 'cell_gate_activations_decoder'
+ACTIVATIONS_LSTM_CELL_GATE_ENCODER = 'cell_gate_activations_encoder'
+ACTIVATIONS_LSTM_INPUT_GATE_DECODER = 'input_gate_activations_decoder'
+ACTIVATIONS_LSTM_INPUT_GATE_ENCODER = 'input_gate_activations_encoder'
+ACTIVATIONS_LSTM_FORGET_GATE_DECODER = 'forget_gate_activations_decoder'
+ACTIVATIONS_LSTM_FORGET_GATE_ENCODER = 'forget_gate_activations_encoder'
+ACTIVATIONS_LSTM_OUTPUT_GATE_DECODER = 'output_gate_activations_decoder'
+ACTIVATIONS_LSTM_OUTPUT_GATE_ENCDODER = 'output_gate_activations_encoder'
 
 if __name__ == "__main__":
     # Input vocabulary indices (
@@ -204,7 +225,7 @@ if __name__ == "__main__":
     target_position = -1 # either a specific timestep or -1 for disregarding the timestep
     activations_dataset_path = "./data/guided_gru_1_all.pt"
 
-    input_for_prediction = 'hidden_activations_encoder'
+    input_for_prediction = ACTIVATIONS_GRU_RESET_GATE_DECODER
 
     # number of runs to get average of classifier weights
     num_runs = 100
