@@ -60,11 +60,9 @@ class FunctionalGroupsDataset(ActivationsDataset):
         if not self.target_feature_label_added:
             # Column describing whether the target feature is present in input sequence
             self.columns = [target_activations, "target_feature_present"]
-            num_positive = 0
 
             regressor_inputs = []
             regressor_class_labels = []
-            LABEL_NO_TABLE = -1
 
             for model_input, target_activations_timesteps in zip(self.model_inputs, getattr(self, target_activations)):
                     for ts, target_activation in enumerate(target_activations_timesteps):
@@ -75,29 +73,18 @@ class FunctionalGroupsDataset(ActivationsDataset):
                                 regressor_inputs.append(target_activation)
                                 label = target_features.index(model_input.flatten()[ts])
                                 regressor_class_labels.append(label)
-                            #else:
-                            #    regressor_inputs.append(target_activation)
-                            #    regressor_class_labels.append(LABEL_NO_TABLE)
 
                         #regarding position
                         else:
-                            if ts == target_position and model_input.flatten()[ts] in target_features:
+                            if ts == target_position and model_input.flatten()[target_position] in target_features:
                                 regressor_inputs.append(target_activation)
-                                label = target_features.index(model_input.flatten()[ts])
+                                label = target_features.index(model_input.flatten()[target_position])
                                 regressor_class_labels.append(label)
-                            #else:
-                            #    regressor_inputs.append(target_activation)
-                            #    regressor_class_labels.append(LABEL_NO_TABLE)
-
-            # Balance data set
-            #regressor_decoder_hidden_states = regressor_inputs + negative_decoder_hidden_states[:num_positive]
-            #regressor_class_labels = [1] * num_positive + [0] * num_positive
 
             # Overwrite data using the new class label column
             self.regressor_inputs = np.array(regressor_inputs)
             self.regressor_label_column = np.array(regressor_class_labels)
 
-            #self.length = 2 * num_positive
 
             self.target_feature_label_added = True  # Only allow this logic to be called once
 
@@ -229,12 +216,13 @@ if __name__ == "__main__":
 
     target_features = [3,4,5,6,7,8,17,18]  # tables = [3,4,5,6,7,8,17,18] # inputs = [10,14,9,13,12,15,11,16]
     target_position = -1 # either a specific timestep or -1 for disregarding the timestep
-    activations_dataset_path = "./data/guided_gru_1_all.pt"
+    activations_dataset_path = "./data/guided_lstm_1_all.pt"
+    print(activations_dataset_path)
 
-    input_for_prediction = ACTIVATIONS_HIDDEN_UNITS_ENCODER
+    input_for_prediction = ACTIVATIONS_LSTM_OUTPUT_GATE_DECODER
 
     # number of runs to get average of classifier weights
-    num_runs = 2
+    num_runs = 5
 
     subset, subset_accuracy = perform_ablation_study(activations_dataset_path, target_features, target_position, input_for_prediction, num_runs=num_runs)
 
