@@ -51,7 +51,7 @@ class FunctionalGroupsDataset(ActivationsDataset):
             ))
         )
 
-    def add_dataset_for_regressor(self, target_feature: int, target_activations: str):
+    def add_dataset_for_regressor(self, target_feature: int, target_activations: str, target_position=-1):
         """
         Add a binary label to every instance in the data set, telling whether a target feature is present in the input
         sequence (and if it is at a specified position given that position_sensitive > -1).
@@ -67,12 +67,19 @@ class FunctionalGroupsDataset(ActivationsDataset):
                 occurrence_indices = np.where(model_input.flatten() == target_feature)[0]
 
                 for ts, decoder_hidden_state in enumerate(decoder_hidden_states):
-                    # Target feature in input: label 1
-                    if ts in occurrence_indices:
-                        num_positive += 1
-                        positive_decoder_hidden_states.append(decoder_hidden_state)
+                    if target_position == -1:
+                        # Target feature in input: label 1
+                        if ts in occurrence_indices:
+                            num_positive += 1
+                            positive_decoder_hidden_states.append(decoder_hidden_state)
+                        else:
+                            negative_decoder_hidden_states.append(decoder_hidden_state)
                     else:
-                        negative_decoder_hidden_states.append(decoder_hidden_state)
+                        if ts in occurrence_indices and ts == target_position:
+                            num_positive += 1
+                            positive_decoder_hidden_states.append(decoder_hidden_state)
+                        else:
+                            negative_decoder_hidden_states.append(decoder_hidden_state)
 
             # Balance data set
             regressor_decoder_hidden_states = positive_decoder_hidden_states + negative_decoder_hidden_states[
@@ -88,7 +95,7 @@ class FunctionalGroupsDataset(ActivationsDataset):
             self.target_feature_label_added = True  # Only allow this logic to be called once
 
 
-def perform_ablation_study(activations_dataset_path, target_feature, num_runs=1000, train_test_split=(0.9, 0.1),
+def perform_ablation_study(activations_dataset_path, target_feature, target_position, num_runs=1000, train_test_split=(0.9, 0.1),
                            target_accuracy_cut=0.95):
     """
     Perform an ablation study by stepwise adding units to a subset until target accuracy is reached. The units are
@@ -104,7 +111,7 @@ def perform_ablation_study(activations_dataset_path, target_feature, num_runs=10
     # Load data and split into sets
     full_dataset = FunctionalGroupsDataset.load(activations_dataset_path, convert_to_numpy=True)
     full_dataset.add_dataset_for_regressor(
-        target_feature=target_feature, target_activations="hidden_activations_decoder"
+        target_feature=target_feature, target_activations="hidden_activations_decoder",target_position=target_position
     )
 
     def train_regressor(X, y, training_indices, test_indices):
@@ -194,10 +201,11 @@ if __name__ == "__main__":
     # t7: 17
 
     target_feature = 3  # t1 = 3
-    activations_dataset_path = "./guided_gru_1_all.pt"
+    target_position = 1
+    activations_dataset_path = "./data/baseline_lstm_1_all.pt"
 
-    subset, subset_accuracy = perform_ablation_study(activations_dataset_path, target_feature)
+    subset, subset_accuracy = perform_ablation_study(activations_dataset_path, target_feature, target_position)
 
-
+    print(len(subset))
 
 
