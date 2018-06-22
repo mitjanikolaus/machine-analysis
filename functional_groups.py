@@ -194,14 +194,10 @@ ACTIVATIONS_HIDDEN_UNITS_ENCODER = 'hidden_activations_encoder'
 #GRU Gates
 ACTIVATIONS_GRU_INPUT_GATE_DECODER = 'input_gate_activations_decoder'
 ACTIVATIONS_GRU_INPUT_GATE_ENCODER = 'input_gate_activations_encoder'
-ACTIVATIONS_GRU_NEW_GATE_DECODER = 'new_gate_activations_decoder'
-ACTIVATIONS_GRU_NEW_GATE_ENCODER = 'new_gate_activations_encoder'
 ACTIVATIONS_GRU_RESET_GATE_DECODER = 'reset_gate_activations_decoder'
 ACTIVATIONS_GRU_RESET_GATE_ENCODER = 'reset_gate_activations_encoder'
 
 #LSTM Gates
-ACTIVATIONS_LSTM_CELL_GATE_DECODER = 'cell_gate_activations_decoder'
-ACTIVATIONS_LSTM_CELL_GATE_ENCODER = 'cell_gate_activations_encoder'
 ACTIVATIONS_LSTM_INPUT_GATE_DECODER = 'input_gate_activations_decoder'
 ACTIVATIONS_LSTM_INPUT_GATE_ENCODER = 'input_gate_activations_encoder'
 ACTIVATIONS_LSTM_FORGET_GATE_DECODER = 'forget_gate_activations_decoder'
