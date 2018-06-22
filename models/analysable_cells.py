@@ -79,7 +79,7 @@ class AnalysableLSTMCell(nn.Module):
 
         gates = {
             "input_gate_activations": ingate, "forget_gate_activations": forgetgate,
-            "output_gate_activations": outgate, "cell_gate_activations": cy_tilde
+            "output_gate_activations": outgate
         }
 
         if self.save_dont_return:
@@ -120,8 +120,16 @@ class AnalysableGRUCell(nn.Module):
 
         output = hy[self.num_layers - 1].clone().unsqueeze(0)
 
+        # The pytorch implementation is different from the classical GRU cell, because it comprises a resetgate,
+        # inputgate and newgate instead of update gate and reset gate (compare with
+        # https://en.wikipedia.org/wiki/Gated_recurrent_unit).
+        # Apparently, the weight matrices W_z, W_r and W_h have been combined into w_ih as well as U_z, U_r and U_h
+        # into w_hh. That implies that the biases are also combined (b_z, b_r and b_h into b_ih AND b_hh), meaning
+        # that a * b_ih + b * b_hh = concat(b_z, b_r, b_h) for a, b > 0 and a + b = 1, which doesn't change the results
+        # for the reset and input (= update) gate.
+
         gates = {
-            "input_gate_activations": inputgate, "reset_gate_activations": resetgate, "new_gate_activations": newgate
+            "input_gate_activations": inputgate, "reset_gate_activations": resetgate
         }
 
         if self.save_dont_return:
