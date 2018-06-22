@@ -4,17 +4,25 @@ Define different utility functions, e.g. for different kinds of visualization.
 
 # STD
 import re
+from random import sample
+import os
 
 # EXT
 import torch
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import cm
-
 from mpl_toolkits.axes_grid1 import AxesGrid
 import numpy as np
+import seaborn as sns
+import pandas as pd
 
 # PROJECT
 from activations import ActivationsDataset
+from models.analysable_seq2seq import AnalysableSeq2seq
+
+# CONST
+BASELINE_COLOR = "tab:blue"
+GA_COLOR = "tab:orange"
 
 
 def plot_hidden_activations(activations, input_length, num_units_to_plot=50):
@@ -115,7 +123,8 @@ def plot_activation_distributions(all_timesteps_activations: np.array, grid_size
     plt.show()
 
 
-def plot_activation_distributions_development(show_title=True, name_func=lambda name: name, **samples_all_time_step_activations):
+def plot_activation_distributions_development(show_title=True, name_func=lambda name: name,
+                                              **samples_all_time_step_activations):
     """
     Plot how the distributions of activation values change for multiple samples as a box and whiskers plot.
     """
@@ -152,6 +161,60 @@ def plot_activation_distributions_development(show_title=True, name_func=lambda 
         )
 
     plt.show()
+
+
+def contrast_activation_distributions_development(show_title=True, save=None, subtitle=None,
+                                                  **samples_all_time_step_activations):
+    """
+    Contrast the distribution of activation values over multiple time steps for two models as a violin plot.
+    """
+    assert len(samples_all_time_step_activations) == 2, "Contrasting not possible with more than two models at once"
+    models = list(samples_all_time_step_activations.keys())
+
+    # Painstakingly convert the data into a pandas Dataframe, where every single activation value is one row in a big
+    # table and further columns determine the model the value belongs to as well as the time step
+    data = pd.DataFrame(
+        data={
+            "activation": np.concatenate([
+                np.concatenate(data, axis=0)
+                for model, data in samples_all_time_step_activations.items()
+            ], axis=0),
+            "model": np.concatenate([
+                np.array([model] * data.shape[0] * data.shape[1])
+                for model, data in samples_all_time_step_activations.items()
+            ], axis=0),
+            "time_step": np.concatenate([
+                np.concatenate([
+                    np.array([time_step] * data.shape[1]) for time_step in range(data.shape[0])
+                ], axis=0)
+                for model, data in samples_all_time_step_activations.items()
+            ], axis=0),
+        }
+    )
+
+    plt.figure()
+    sns.violinplot(
+        x="time_step", y="activation", hue="model", data=data, split=True,
+        palette={models[0]: BASELINE_COLOR, models[1]: GA_COLOR}
+    )
+
+    if show_title:
+        plt.title("Distribution of activation values for models {} and {} over {} time steps".format(
+            *samples_all_time_step_activations.keys(), len(samples_all_time_step_activations))
+        )
+
+    plt.tight_layout()
+    plt.legend(loc="lower right")
+
+    # Add subtitle if given
+    if subtitle:
+        plt.figtext(0.14, 0.15, subtitle, fontsize=12, ha='left')
+
+    if save is None:
+        plt.show()
+    else:
+        plt.savefig(save, bbox_inches="tight")
+        plt.close()
 
 
 def plot_activation_gradients(all_timesteps_activations: np.array, neuron_heatmap_size: tuple, show_title=True,
@@ -197,6 +260,78 @@ def plot_activation_gradients(all_timesteps_activations: np.array, neuron_heatma
         plt.show()
     else:
         plt.savefig(save, bbox_inches="tight")
+        plt.close()
+
+
+def plot_neuron_activity(activations, num_neuron_samples: int, mode="lv", color=None, neuron_samples=None, save=None):
+    """
+    Plot the activation values for a certain number of randomly sampled neurons over all samples.
+    """
+    assert mode in ("lv", "boxes"), "Mode has to be either 'lv' or 'boxes, '{}' found.".format(mode)
+
+    num_neurons = activations[0].shape[1]
+
+    sampled_neurons = neuron_samples
+    if neuron_samples is None:
+        sampled_neurons = sample(range(num_neurons), k=num_neuron_samples)
+
+    activations_per_neuron = np.empty((num_neuron_samples, 0))
+
+    # Aggregate activations for sample neurons
+    for data_point in activations:
+        for time_step in data_point:
+            current_neuron_activations = time_step[sampled_neurons].reshape(-1, 1)
+            activations_per_neuron = np.concatenate((activations_per_neuron, current_neuron_activations), axis=1)
+
+    # Create LV plot
+    if mode == "lv":
+        # Create pandas data frame object
+        rows, columns = activations_per_neuron.shape
+        data = pd.DataFrame(
+            data={
+                "activation": activations_per_neuron.reshape(rows * columns, ),
+                "neuron": np.concatenate([
+                    np.array([neuron_index] * columns) for neuron_index in range(1, rows + 1)
+                ], axis=0)
+            }
+        )
+
+        # Visualize using Letter value plot
+        ax = sns.lvplot(
+            x="neuron", y="activation", scale="linear", data=data, width=1,
+            palette=sns.color_palette("viridis", n_colors=num_neuron_samples)
+        )
+
+    # Create box and whiskers plot
+    elif mode == "boxes":
+        fig, axis = plt.subplots(1, 1)
+        ax = axis
+
+        # Sort neurons by variance and mean for better readability
+        def _box_size(data):
+            q1, med, q3 = np.percentile(data, [25, 50, 75])
+            return np.abs(q1 - med) + np.abs(q3 - med)
+
+        activations_per_neuron = np.array_split(activations_per_neuron, num_neuron_samples, axis=0)
+        activations_per_neuron = sorted(activations_per_neuron, key=lambda x: _box_size(x))
+
+        bplot = ax.boxplot([
+            activations_per_neuron[i].squeeze() for i in range(num_neuron_samples)
+        ], vert=True, sym="", patch_artist=True, whis=10000, notch=True, manage_xticks=False)
+        # Show min and max by setting whis very high
+
+        # Coloring
+        for patch in bplot["boxes"]:
+            color = "tab:blue" if color is None else color
+            patch.set_facecolor(color)
+
+    ax.set_xticks([i for i in range(1, num_neuron_samples + 1, int(num_neuron_samples / 10))])
+
+    if save is None:
+        plt.show()
+    else:
+        plt.savefig(save, bbox_inches="tight")
+        plt.close()
 
 
 def get_name_from_activation_data_path(path):
@@ -230,12 +365,68 @@ def rectangularfy(array):
     return array
 
 
+def create_all_violin_plots(data_sets, sample_indices, input_vocab=None):
+    """
+    Create all the violin plots for a number of given samples for all the different kinds of activations and model
+    architectures like LSTM and GRU between a baseline and a guided attention model.
+    """
+    for model_type in ("lstm", "gru"):
+        # Only get lstm or gru models
+        relevant_data_sets = [data for model, data in data_sets.items() if model_type in model]
+
+        for column in relevant_data_sets[0].activation_columns:
+            for sample_index in sample_indices:
+                sample_data = {
+                    model: getattr(data, column)[sample_index]
+                    for model, data in data_sets.items()
+                    if model_type in model
+                }
+
+                # Create subtitle if input vocab is given
+                subtitle = None
+                if input_vocab:
+                    input_indices = list(data_sets.values())[0].model_inputs[sample_index].squeeze()
+                    input_seq = [input_vocab.itos[index] for index in list(input_indices)]
+                    subtitle = "Input sequence: " + " ".join(input_seq)
+
+                # Create folder if necessary
+                if not os.path.isdir("./fig/{}_{}_violins".format(column, model_type)):
+                    os.mkdir("./fig/{}_{}_violins".format(column, model_type))
+
+                # Create plot
+                contrast_activation_distributions_development(
+                    **sample_data, show_title=False, subtitle=subtitle,
+                    save="./fig/{}_{}_violins/{}.png".format(column, model_type, sample_index)
+                )
+
+
+def create_all_neuron_activity_plots(data_sets, sampled_neurons):
+    """
+    Create box plots showing the distribution of activation values per neuron over all samples for both baseline and
+    guided attention model over all kinds of activations.
+    """
+    # Create folder if necessary
+    if not os.path.isdir("./fig/neuron_activities"):
+        os.mkdir("./fig/neuron_activities")
+
+    for model_name, data_set in data_sets.items():
+        plot_color = BASELINE_COLOR if "baseline" in model_name else GA_COLOR
+
+        for activations in data_set.activation_columns:
+            plot_neuron_activity(
+                activations=getattr(data_set, activations), num_neuron_samples=len(sampled_neurons),
+                neuron_samples=sampled_neurons, color=plot_color, mode="boxes",
+                save="./fig/neuron_activities/{}_{}_{}neurons.png".format(model_name, activations, len(sampled_neurons))
+            )
+
+
 if __name__ == "__main__":
     # Path to activation data sets
-    baseline_lstm_data_path = './baseline_lstm_1_heldout_tables.pt'
-    baseline_gru_data_path = './baseline_gru_1_heldout_tables.pt'
-    ga_lstm_data_path = './ga_lstm_1_heldout_tables.pt'
-    ga_gru_data_path = './ga_gru_1_heldout_tables.pt'
+    checkpoint_path = '../machine-zoo/guided/gru/1/'
+    baseline_lstm_data_path = './data/baseline_lstm_1_all.pt'
+    baseline_gru_data_path = './data/baseline_gru_1_all.pt'
+    ga_lstm_data_path = './data/guided_lstm_1_all.pt'
+    ga_gru_data_path = './data/guided_gru_1_all.pt'
     data_set_paths = [baseline_lstm_data_path, baseline_gru_data_path, ga_lstm_data_path, ga_gru_data_path]
 
     # Load everything
@@ -243,40 +434,30 @@ if __name__ == "__main__":
     baseline_gru_data = ActivationsDataset.load(baseline_gru_data_path, convert_to_numpy=True)
     ga_lstm_data = ActivationsDataset.load(ga_lstm_data_path, convert_to_numpy=True)
     ga_gru_data = ActivationsDataset.load(ga_gru_data_path, convert_to_numpy=True)
-    data_sets = [baseline_lstm_data, baseline_gru_data, ga_lstm_data, ga_gru_data]
+    data_sets = {
+        "baseline_lstm": baseline_lstm_data, "baseline_gru": baseline_gru_data,
+        "guided_attention_lstm": ga_lstm_data, "guided_attention_gru": ga_gru_data
+    }
+
+    # Load input vocabulary
+    checkpoint = AnalysableSeq2seq.load(checkpoint_path)
+    input_vocab = checkpoint.input_vocab
+    del checkpoint
 
     # Prepare for experiments
-    num_samples = 3
-    target_activations = "forget_gate_activations_encoder"
+    num_samples = 10
+    target_activations = "hidden_activations_decoder"
     #sample_indices = sample(range(len(baseline_gru_data)), num_samples)
-    sample_indices = [39, 52, 87]
-
-    # Plot activations as heat map
-    #encoder_input_length = baseline_lstm_data.model_inputs[0].shape[1]-1
-    #plot_activation_distributions(baseline_lstm_data.hidden_activations_encoder[39], show_title=False)
+    sample_indices = [113, 85, 49, 87, 21, 91, 137, 80, 18, 63]  # Sample once, then use the same ones for consistency
 
     # Plot distribution of activation values in a series of time steps
-    activation_dists_to_plot = {}
-    for path, data_set in zip(data_set_paths, data_sets):
-        average_activations = getattr(data_set, target_activations)[52]
-        activation_dists_to_plot[path] = average_activations
+    create_all_violin_plots(data_sets, sample_indices, input_vocab=input_vocab)
 
-    plot_activation_distributions_development(
-        name_func=get_name_from_activation_data_path, show_title=False, **activation_dists_to_plot
-    )
-
-
-    # Plot changes in activations values
-    #plot_activation_gradients(sample, neuron_heatmap_size=(16, 32))
-    #plot_activation_gradients(
-    #    getattr(ga_lstm_data, target_activations).mean(axis=0), neuron_heatmap_size=(16, 32), show_title=False, absolute=True,
-    #)
-
-    # for model_name, data_set in zip(["baseline_lstm", "baseline_gru", "ga_lstm", "ga_gru"], data_sets):
-    #     for network_name, network_data in zip(["encoder", "decoder"], ["hidden_activations_encoder", "hidden_activations_decoder"]):
-    #         for act_name, target_activations_func in zip(["39", "avg"], [lambda x: x[39], lambda x: x.mean(axis=0)]):
-    #             plot_activation_gradients(
-    #                 target_activations_func(getattr(data_set, network_data)), neuron_heatmap_size=(16, 32),
-    #                 show_title=False, absolute=True,
-    #                 save="./fig/gradients_{}_{}_{}.png".format(model_name, network_name, act_name)
-    #             )
+    # Plot neuron activity for some sample neurons
+    num_neurons = 512
+    num_sample_neurons = 50
+    #sampled_neurons = sample(range(num_neurons), k=num_sample_neurons)
+    sampled_neurons = [92, 19, 94, 338, 52, 444, 145, 57, 496, 50, 91, 267, 139, 179, 159, 359, 74, 58, 113, 293, 175,
+                       308, 105, 75, 224, 316, 435, 142, 67, 364, 173, 286, 511, 148, 394, 460, 8, 348, 463, 389, 180,
+                       125, 339, 155, 391, 467, 188, 333, 478, 349]
+    #create_all_neuron_activity_plots(data_sets, sampled_neurons)
