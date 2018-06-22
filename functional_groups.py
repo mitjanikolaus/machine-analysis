@@ -168,14 +168,10 @@ ACTIVATIONS_HIDDEN_UNITS_ENCODER = 'hidden_activations_encoder'
 #GRU Gates
 ACTIVATIONS_GRU_INPUT_GATE_DECODER = 'input_gate_activations_decoder'
 ACTIVATIONS_GRU_INPUT_GATE_ENCODER = 'input_gate_activations_encoder'
-ACTIVATIONS_GRU_NEW_GATE_DECODER = 'new_gate_activations_decoder'
-ACTIVATIONS_GRU_NEW_GATE_ENCODER = 'new_gate_activations_encoder'
 ACTIVATIONS_GRU_RESET_GATE_DECODER = 'reset_gate_activations_decoder'
 ACTIVATIONS_GRU_RESET_GATE_ENCODER = 'reset_gate_activations_encoder'
 
 #LSTM Gates
-ACTIVATIONS_LSTM_CELL_GATE_DECODER = 'cell_gate_activations_decoder'
-ACTIVATIONS_LSTM_CELL_GATE_ENCODER = 'cell_gate_activations_encoder'
 ACTIVATIONS_LSTM_INPUT_GATE_DECODER = 'input_gate_activations_decoder'
 ACTIVATIONS_LSTM_INPUT_GATE_ENCODER = 'input_gate_activations_encoder'
 ACTIVATIONS_LSTM_FORGET_GATE_DECODER = 'forget_gate_activations_decoder'
@@ -205,12 +201,12 @@ if __name__ == "__main__":
     # t6: 8
     # t7: 17
 
-    activations_dataset_path = "./data/guided_gru_1_all_with_longer.pt"
+    activations_dataset_path = "./data/longer/guided_gru_1_all_with_longer.pt"
 
     input_for_prediction = ACTIVATIONS_HIDDEN_UNITS_ENCODER
 
     # number of runs to get average of classifier weights
-    num_runs = 2
+    num_runs = 5
 
     subset, subset_accuracy = perform_ablation_study_predict_timestep(activations_dataset_path, input_for_prediction, num_runs=num_runs, target_accuracy_cut=.95)
 
