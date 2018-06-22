@@ -95,7 +95,7 @@ class FunctionalGroupsDataset(ActivationsDataset):
             self.target_feature_label_added = True  # Only allow this logic to be called once
 
 
-def perform_ablation_study(activations_dataset_path, target_feature, target_position, num_runs=1000, train_test_split=(0.9, 0.1),
+def perform_ablation_study(activations_dataset_path, target_feature, target_position, input_for_prediction, num_runs=1000, train_test_split=(0.9, 0.1),
                            target_accuracy_cut=0.95):
     """
     Perform an ablation study by stepwise adding units to a subset until target accuracy is reached. The units are
@@ -111,7 +111,7 @@ def perform_ablation_study(activations_dataset_path, target_feature, target_posi
     # Load data and split into sets
     full_dataset = FunctionalGroupsDataset.load(activations_dataset_path, convert_to_numpy=True)
     full_dataset.add_dataset_for_regressor(
-        target_feature=target_feature, target_activations="hidden_activations_decoder",target_position=target_position
+        target_feature=target_feature, target_activations=input_for_prediction,target_position=target_position
     )
 
     def train_regressor(X, y, training_indices, test_indices):
@@ -201,10 +201,15 @@ if __name__ == "__main__":
     # t7: 17
 
     target_feature = 3  # t1 = 3
-    target_position = 1
-    activations_dataset_path = "./data/baseline_lstm_1_all.pt"
+    target_position = -1 # either a specific timestep or -1 for disregarding the timestep
+    activations_dataset_path = "./data/guided_gru_1_all.pt"
 
-    subset, subset_accuracy = perform_ablation_study(activations_dataset_path, target_feature, target_position)
+    input_for_prediction = 'hidden_activations_encoder'
+
+    # number of runs to get average of classifier weights
+    num_runs = 100
+
+    subset, subset_accuracy = perform_ablation_study(activations_dataset_path, target_feature, target_position, input_for_prediction, num_runs=num_runs)
 
     print(len(subset))
 
