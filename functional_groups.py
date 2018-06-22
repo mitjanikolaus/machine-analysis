@@ -52,7 +52,7 @@ class FunctionalGroupsDataset(ActivationsDataset):
             ))
         )
 
-    def add_dataset_for_regressor(self, target_features: [], target_activations: str, target_position=-1):
+    def add_dataset_for_regressor_predicting_timestep(self, target_activations: str):
         """
         Add a binary label to every instance in the data set, telling whether a target feature is present in the input
         sequence (and if it is at a specified position given that position_sensitive > -1).
@@ -60,50 +60,25 @@ class FunctionalGroupsDataset(ActivationsDataset):
         if not self.target_feature_label_added:
             # Column describing whether the target feature is present in input sequence
             self.columns = [target_activations, "target_feature_present"]
-            num_positive = 0
 
             regressor_inputs = []
             regressor_class_labels = []
-            LABEL_NO_TABLE = -1
 
             for model_input, target_activations_timesteps in zip(self.model_inputs, getattr(self, target_activations)):
                     for ts, target_activation in enumerate(target_activations_timesteps):
-                        #disregarding position
-                        if target_position == -1:
-                            # Target feature in input: label 1
-                            if model_input.flatten()[ts] in target_features:
-                                regressor_inputs.append(target_activation)
-                                label = target_features.index(model_input.flatten()[ts])
-                                regressor_class_labels.append(label)
-                            #else:
-                            #    regressor_inputs.append(target_activation)
-                            #    regressor_class_labels.append(LABEL_NO_TABLE)
-
-                        #regarding position
-                        else:
-                            if ts == target_position and model_input.flatten()[ts] in target_features:
-                                regressor_inputs.append(target_activation)
-                                label = target_features.index(model_input.flatten()[ts])
-                                regressor_class_labels.append(label)
-                            #else:
-                            #    regressor_inputs.append(target_activation)
-                            #    regressor_class_labels.append(LABEL_NO_TABLE)
-
-            # Balance data set
-            #regressor_decoder_hidden_states = regressor_inputs + negative_decoder_hidden_states[:num_positive]
-            #regressor_class_labels = [1] * num_positive + [0] * num_positive
+                        regressor_inputs.append(target_activation)
+                        label = ts
+                        regressor_class_labels.append(label)
 
             # Overwrite data using the new class label column
             self.regressor_inputs = np.array(regressor_inputs)
             self.regressor_label_column = np.array(regressor_class_labels)
 
-            #self.length = 2 * num_positive
-
             self.target_feature_label_added = True  # Only allow this logic to be called once
 
 
-def perform_ablation_study(activations_dataset_path, target_features, target_position, input_for_prediction, num_runs=1000, train_test_split=(0.9, 0.1),
-                           target_accuracy_cut=0.95):
+def perform_ablation_study_predict_timestep(activations_dataset_path, input_for_prediction, num_runs=1000, train_test_split=(0.9, 0.1),
+                                            target_accuracy_cut=0.95):
     """
     Perform an ablation study by stepwise adding units to a subset until target accuracy is reached. The units are
     chosen based on the weights they were assigned in a logistic regressor
@@ -117,9 +92,8 @@ def perform_ablation_study(activations_dataset_path, target_features, target_pos
     """
     # Load data and split into sets
     full_dataset = FunctionalGroupsDataset.load(activations_dataset_path, convert_to_numpy=True)
-    full_dataset.add_dataset_for_regressor(
-        target_features=target_features, target_activations=input_for_prediction,target_position=target_position
-    )
+    full_dataset.add_dataset_for_regressor_predicting_timestep(target_activations=input_for_prediction
+                                                               )
 
     def train_regressor(X, y, training_indices, test_indices):
         #TODO multi_class = ovr or multinomial
@@ -231,16 +205,14 @@ if __name__ == "__main__":
     # t6: 8
     # t7: 17
 
-    target_features = [3,4,5,6,7,8,17,18]  # tables = [3,4,5,6,7,8,17,18] # inputs = [10,14,9,13,12,15,11,16]
-    target_position = -1 # either a specific timestep or -1 for disregarding the timestep
-    activations_dataset_path = "./data/guided_gru_1_all.pt"
+    activations_dataset_path = "./data/guided_gru_1_all_with_longer.pt"
 
     input_for_prediction = ACTIVATIONS_HIDDEN_UNITS_ENCODER
 
     # number of runs to get average of classifier weights
     num_runs = 2
 
-    subset, subset_accuracy = perform_ablation_study(activations_dataset_path, target_features, target_position, input_for_prediction, num_runs=num_runs)
+    subset, subset_accuracy = perform_ablation_study_predict_timestep(activations_dataset_path, input_for_prediction, num_runs=num_runs, target_accuracy_cut=.95)
 
     print(len(subset))
 
