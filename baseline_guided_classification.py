@@ -4,6 +4,8 @@ from sklearn.linear_model import LogisticRegression
 
 from activations import CounterDataset
 
+BASELINE_LABEL = 0
+GUIDED_LABEL = 1
 
 def keywords_in_dataset(dataset_path: str, keywords: []) -> bool:
     return all([keyword in dataset_path for keyword in keywords])
@@ -25,24 +27,34 @@ guided_paths = filter(lambda dataset: keywords_in_dataset(dataset, ['guided', 's
 
 
 baseline_dataset = np.empty((0, 512))
+heldout_baseline = np.empty((0, 512))
 baseline_labels = []
 
 guided_dataset = np.empty((0, 512))
+heldout_guided = np.empty((0, 512))
 guided_labels = []
 
-for dataset_path in baseline_paths:
+for index, dataset_path in enumerate(baseline_paths):
 
     dataset = CounterDataset.load('data/encoder_counter_datasets/' + dataset_path)
-    data, labels = data_from_counter(dataset, 0, lambda target: target == 2)
-    baseline_dataset = np.concatenate((baseline_dataset, data))
-    baseline_labels.extend(labels)
+    data, labels = data_from_counter(dataset, BASELINE_LABEL, lambda target: target == 2)
 
-for dataset_path in guided_paths:
+    if index == 0:
+        heldout_baseline = np.concatenate((baseline_dataset, data))
+    else:
+        baseline_dataset = np.concatenate((baseline_dataset, data))
+        baseline_labels.extend(labels)
+
+for index, dataset_path in enumerate(guided_paths):
 
     dataset = CounterDataset.load('data/encoder_counter_datasets/' + dataset_path)
-    data, labels = data_from_counter(dataset, 1, lambda target: target == 2)
-    guided_dataset = np.concatenate((guided_dataset, data))
-    guided_labels.extend(labels)
+    data, labels = data_from_counter(dataset, GUIDED_LABEL, lambda target: target == 2)
+
+    if index == 0:
+        heldout_guided = np.concatenate((guided_dataset, data))
+    else:
+        guided_dataset = np.concatenate((guided_dataset, data))
+        guided_labels.extend(labels)
 
 
 full_data, full_labels = np.concatenate((baseline_dataset, guided_dataset)), np.array(baseline_labels + guided_labels)
@@ -67,9 +79,13 @@ logistic_regression.fit(
     training_data, training_labels
 )
 
-accuracy = get_accuracy(logistic_regression.predict(test_data), test_labels)
+testset_accuracy = get_accuracy(logistic_regression.predict(test_data), test_labels)
+heldout_baseline_accuracy = get_accuracy(logistic_regression.predict(heldout_baseline), [BASELINE_LABEL]*heldout_baseline.shape[0])
+heldout_guided_accuracy = get_accuracy(logistic_regression.predict(heldout_guided), [GUIDED_LABEL]*heldout_guided.shape[0])
 
-print('Accuracy: ', accuracy)
+print('Test ccuracy: ', testset_accuracy)
+print('Heldout baseline accuracy: ', heldout_baseline_accuracy)
+print('Heldout guided accuracy: ', heldout_guided_accuracy)
 
 
 print('')
