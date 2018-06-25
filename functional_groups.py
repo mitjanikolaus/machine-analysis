@@ -109,8 +109,6 @@ def perform_ablation_study(activations_dataset_path, target_features, target_pos
     )
 
     def train_regressor(X, y, training_indices, test_indices):
-        #TODO multi_class = ovr or multinomial
-        #TODO solver? max_iter?
         regressor = LogisticRegression(n_jobs=-1, verbose=0, multi_class='multinomial',solver='saga', max_iter=100)
         regressor.fit(X[training_indices], y[training_indices])
 
