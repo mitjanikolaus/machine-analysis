@@ -216,16 +216,16 @@ if __name__ == "__main__":
 
     target_features = [3,4,5,6,7,8,17,18]  # tables = [3,4,5,6,7,8,17,18] # inputs = [10,14,9,13,12,15,11,16]
     target_position = -1 # either a specific timestep or -1 for disregarding the timestep
-    activations_dataset_path = "./data/guided_lstm_1_all.pt"
+    activations_dataset_path = "./data/guided_gru_1_all.pt"
     print(activations_dataset_path)
 
-    input_for_prediction = ACTIVATIONS_LSTM_OUTPUT_GATE_DECODER
+    input_for_prediction = ACTIVATIONS_HIDDEN_UNITS_ENCODER
 
     # number of runs to get average of classifier weights
     num_runs = 5
 
     subset, subset_accuracy = perform_ablation_study(activations_dataset_path, target_features, target_position, input_for_prediction, num_runs=num_runs)
 
-    print(len(subset))
+    print('Size of functional group: ',len(subset))
 
 
