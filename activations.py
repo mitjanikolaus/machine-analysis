@@ -3,6 +3,7 @@
 """
 
 # EXT
+from typing import List, Any, Tuple
 from torch.utils.data import Dataset
 from torch import Tensor
 import torch
@@ -61,3 +62,21 @@ class ActivationsDataset(Dataset):
                 setattr(dataset, activation_column, converted_activations)
 
         return dataset
+
+
+class CounterDataset(ActivationsDataset):
+
+    def __init__(self, model_inputs: list, model_outputs: list, **activations):
+        super(CounterDataset, self).__init__(model_inputs, model_outputs, **activations)
+
+        # Make data have the structure (timestep: int, activation: Tensor), with activation being size 1 x 1 x hidden_size
+        # 1 for encoder, 2 for decoder
+        self.data = _flatten_list([list(enumerate(activation[2])) for activation in self.data])
+        self.length = len(self.data)
+
+    def __getitem__(self, item: int) -> Tuple[int, Tensor]:
+        return self.data[item]
+
+
+def _flatten_list(list: List[List[Any]]) -> List[Any]:
+    return [item for sublist in list for item in sublist]
