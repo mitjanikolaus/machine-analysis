@@ -96,8 +96,6 @@ def perform_ablation_study_predict_timestep(activations_dataset_path, input_for_
                                                                )
 
     def train_regressor(X, y, training_indices, test_indices):
-        #TODO multi_class = ovr or multinomial
-        #TODO solver? max_iter?
         regressor = LogisticRegression(n_jobs=-1, verbose=0, multi_class='multinomial',solver='saga', max_iter=100)
         regressor.fit(X[training_indices], y[training_indices])
 
@@ -177,7 +175,7 @@ ACTIVATIONS_LSTM_INPUT_GATE_ENCODER = 'input_gate_activations_encoder'
 ACTIVATIONS_LSTM_FORGET_GATE_DECODER = 'forget_gate_activations_decoder'
 ACTIVATIONS_LSTM_FORGET_GATE_ENCODER = 'forget_gate_activations_encoder'
 ACTIVATIONS_LSTM_OUTPUT_GATE_DECODER = 'output_gate_activations_decoder'
-ACTIVATIONS_LSTM_OUTPUT_GATE_ENCDODER = 'output_gate_activations_encoder'
+ACTIVATIONS_LSTM_OUTPUT_GATE_ENCODER = 'output_gate_activations_encoder'
 
 if __name__ == "__main__":
     # Input vocabulary indices (
