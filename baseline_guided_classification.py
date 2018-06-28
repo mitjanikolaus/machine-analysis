@@ -7,8 +7,10 @@ from activations import CounterDataset
 BASELINE_LABEL = 0
 GUIDED_LABEL = 1
 
+
 def keywords_in_dataset(dataset_path: str, keywords: []) -> bool:
     return all([keyword in dataset_path for keyword in keywords])
+
 
 def data_from_counter(source_dataset: CounterDataset, label, filter):
 
@@ -71,8 +73,10 @@ test_data = labeled_test_data[:, :-1]
 training_labels = labeled_training_data[:, -1]
 test_labels = labeled_test_data[:, -1]
 
+
 def get_accuracy(predictions, labels) -> float:
     return sum(prediction == label for prediction, label in zip(predictions, labels)) / len(predictions)
+
 
 logistic_regression = LogisticRegression()
 logistic_regression.fit(

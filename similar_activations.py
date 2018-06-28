@@ -1,15 +1,20 @@
 
+# EXT
 import numpy as np
 import matplotlib.pyplot as plt
-
 from scipy.stats import ttest_rel
 
+# PROJECT
 from models.analysable_seq2seq import AnalysableSeq2seq
 from activations import ActivationsDataset
 
-def run_analysis(rnn_type, similar_input_criterium, other_input_criterium, models_to_evaluate, model_part_to_evaluate, compare, print_outliers=True, legend_labels=('similar input','other input'), legend_location=(2,2)):
+
+def run_analysis(rnn_type, similar_input_criterium, other_input_criterium, models_to_evaluate, model_part_to_evaluate,
+                 compare, print_outliers=True, legend_labels=('similar input', 'other input'), legend_location=(2, 2)):
     """
-    Perform an analysis of similarity of activations for two different sample groups. The sample groups are created depending on the given criteria on the input: similar_input_criterium and other_input_criterium.
+    Perform an analysis of similarity of activations for two different sample groups. The sample groups are created
+    depending on the given criteria on the input: similar_input_criterium and other_input_criterium.
+
     :param rnn_type: lstm or gru
     :param similar_input_criterium: criterium for the first sample group
     :param other_input_criterium: criterium for the second sample group (return just True to compare to all samples)
@@ -32,9 +37,13 @@ def run_analysis(rnn_type, similar_input_criterium, other_input_criterium, model
 
             activations_dataset_path = 'data/' + model_type + '_' + rnn_type + '_'+str(model_id)+'_all.pt'
 
-            samples_group_similar, samples_group_other = prepare_test_data(activations_dataset_path, similar_input_criterium, other_input_criterium, model_part_to_evaluate)
+            samples_group_similar, samples_group_other = prepare_test_data(
+                activations_dataset_path, similar_input_criterium, other_input_criterium, model_part_to_evaluate
+            )
 
-            distances_similar, distances_other = run_models_and_evaluate(samples_group_similar, samples_group_other, compare, print_outliers)
+            distances_similar, distances_other = run_models_and_evaluate(
+                samples_group_similar, samples_group_other, compare, print_outliers
+            )
 
             if model_type == 'baseline':
                 if distances_baseline_similar_all_models == []:
@@ -55,7 +64,7 @@ def run_analysis(rnn_type, similar_input_criterium, other_input_criterium, model
 
     timesteps = np.arange(len(distances_baseline_similar_all_models))
 
-    #perform t-tests
+    # perform t-tests
     print('t-test results: ')
     for ts in timesteps:
         print('Timestep: ',ts)
@@ -90,6 +99,7 @@ def run_analysis(rnn_type, similar_input_criterium, other_input_criterium, model
     #plt.suptitle(model_part_to_evaluate)
     plt.tight_layout(pad=.5)
     plt.show()
+
 
 def run_models_and_evaluate(activation_data_similar, activation_data_other, compare, print_outliers=True):
     if compare == COMPARE_SAMPLES:
@@ -146,6 +156,7 @@ def calculate_distances_among_samples(activation_data):
                             distances[ts].append(single_distances)
         return distances
 
+
 def calculate_distances_among_timesteps(activation_data):
     distances = []
     for i, input_sample in enumerate(activation_data):
@@ -156,6 +167,7 @@ def calculate_distances_among_timesteps(activation_data):
                 single_distances = (np.square(np.subtract(input_sample_timestep, input_sample[ts+1])))
                 distances[ts].append(single_distances)
     return distances
+
 
 def prepare_test_data(activations_dataset_path, similar_input_criterium, other_input_criterium, model_part_to_evaluate):
     samples_group_similar = []
@@ -171,17 +183,18 @@ def prepare_test_data(activations_dataset_path, similar_input_criterium, other_i
 
     return samples_group_similar, samples_group_other
 
-#Hidden units
+
+# Hidden units
 ACTIVATIONS_HIDDEN_UNITS_DECODER = 'hidden_activations_decoder'
 ACTIVATIONS_HIDDEN_UNITS_ENCODER = 'hidden_activations_encoder'
 
-#GRU Gates
+# GRU Gates
 ACTIVATIONS_GRU_INPUT_GATE_DECODER = 'input_gate_activations_decoder'
 ACTIVATIONS_GRU_INPUT_GATE_ENCODER = 'input_gate_activations_encoder'
 ACTIVATIONS_GRU_RESET_GATE_DECODER = 'reset_gate_activations_decoder'
 ACTIVATIONS_GRU_RESET_GATE_ENCODER = 'reset_gate_activations_encoder'
 
-#LSTM Gates
+# LSTM Gates
 ACTIVATIONS_LSTM_INPUT_GATE_DECODER = 'input_gate_activations_decoder'
 ACTIVATIONS_LSTM_INPUT_GATE_ENCODER = 'input_gate_activations_encoder'
 ACTIVATIONS_LSTM_FORGET_GATE_DECODER = 'forget_gate_activations_decoder'
@@ -211,13 +224,16 @@ if __name__ == "__main__":
 
     # criterium for filtering inputs
     def similar_input_criterium(sample):
-        return  input_vocab.itos[sample[1]] == 't1' #and input_vocab.itos[sample[2]] == 't1' #input_vocab.itos[sample[0]] == '000' and
+        return input_vocab.itos[sample[1]] == 't1' #and input_vocab.itos[sample[2]] == 't1' #input_vocab.itos[sample[0]] == '000' and
 
     #c riterium for baseline to compare to
     def other_input_criterium(sample):
         # return just True to get a baseline of all samples
-        return True #and input_vocab.itos[sample[0]] == '000'
+        return True  #and input_vocab.itos[sample[0]] == '000'
 
     legend_labels = ('Input: XXX t1 X','Input: XXX X X')
-    legend_location = (1,4) #location of legend for (baseline, guided) graphs
-    run_analysis(rnn_type, similar_input_criterium, other_input_criterium, models_to_evaluate, model_part_to_evaluate, compare, print_outliers=print_outliers, legend_labels=legend_labels, legend_location=legend_location)
+    legend_location = (1, 4)  #location of legend for (baseline, guided) graphs
+    run_analysis(
+        rnn_type, similar_input_criterium, other_input_criterium, models_to_evaluate, model_part_to_evaluate, compare,
+        print_outliers=print_outliers, legend_labels=legend_labels, legend_location=legend_location
+    )

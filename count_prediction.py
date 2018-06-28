@@ -72,6 +72,7 @@ class Regression(nn.Module):
     def _subset(self, sample, subset):
         return sample[:, :, subset]
 
+
 def fit_regression(data_directory: str, results_directory: str, data_file: str, epochs=50, leave_out=None, feature_subset:List=None):
 
     data = CounterDataset.load(data_directory + data_file)
