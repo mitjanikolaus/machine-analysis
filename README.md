@@ -7,7 +7,7 @@ with respect to the baseline model, which could help understand the differences 
 produces the same results, but renders the training procedure from the above paper unnecessary. 
 
 Models were trained on [the table lookup task](https://github.com/mitjanikolaus/machine-tasks) and stored in a [model zoo](https://github.com/Kaleidophon/machine-zoo). 
-The original models, coming from [here](https://github.com/i-machine-think/machine), where then augmented in order to allow the extraction
+The original models, coming from [here](https://github.com/i-machine-think/machine), were followingly augmented in order to allow the extraction
 of activation values easily.
 
 ## Results
