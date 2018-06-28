@@ -436,7 +436,7 @@ if __name__ == "__main__":
     ga_gru_data = ActivationsDataset.load(ga_gru_data_path, convert_to_numpy=True)
     data_sets = {
         "baseline_lstm": baseline_lstm_data, "baseline_gru": baseline_gru_data,
-        "guided_attention_lstm": ga_lstm_data, "guided_attention_gru": ga_gru_data
+        "attentive_guidance_lstm": ga_lstm_data, "attentive_guidance_gru": ga_gru_data
     }
 
     # Load input vocabulary
