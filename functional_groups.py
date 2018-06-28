@@ -8,6 +8,7 @@ import math
 
 # EXT
 from sklearn.linear_model import LogisticRegression
+from collections import Counter
 import numpy as np
 
 # PROJECT
@@ -51,7 +52,7 @@ class FunctionalGroupsDataset(ActivationsDataset):
             ))
         )
 
-    def add_dataset_for_regressor(self, target_feature: int, target_activations: str):
+    def add_dataset_for_regressor(self, target_features: [], target_activations: str, target_position=-1):
         """
         Add a binary label to every instance in the data set, telling whether a target feature is present in the input
         sequence (and if it is at a specified position given that position_sensitive > -1).
@@ -59,36 +60,36 @@ class FunctionalGroupsDataset(ActivationsDataset):
         if not self.target_feature_label_added:
             # Column describing whether the target feature is present in input sequence
             self.columns = [target_activations, "target_feature_present"]
-            num_positive = 0
 
-            positive_decoder_hidden_states, negative_decoder_hidden_states = [], []
+            regressor_inputs = []
+            regressor_class_labels = []
 
-            for model_input, decoder_hidden_states in zip(self.model_inputs, getattr(self, target_activations)):
-                occurrence_indices = np.where(model_input.flatten() == target_feature)[0]
+            for model_input, target_activations_timesteps in zip(self.model_inputs, getattr(self, target_activations)):
+                    for ts, target_activation in enumerate(target_activations_timesteps):
+                        #disregarding position
+                        if target_position == -1:
+                            # Target feature in input: label 1
+                            if model_input.flatten()[ts] in target_features:
+                                regressor_inputs.append(target_activation)
+                                label = target_features.index(model_input.flatten()[ts])
+                                regressor_class_labels.append(label)
 
-                for ts, decoder_hidden_state in enumerate(decoder_hidden_states):
-                    # Target feature in input: label 1
-                    if ts in occurrence_indices:
-                        num_positive += 1
-                        positive_decoder_hidden_states.append(decoder_hidden_state)
-                    else:
-                        negative_decoder_hidden_states.append(decoder_hidden_state)
-
-            # Balance data set
-            regressor_decoder_hidden_states = positive_decoder_hidden_states + negative_decoder_hidden_states[
-                                                                               :num_positive]
-            regressor_class_labels = [1] * num_positive + [0] * num_positive
+                        #regarding position
+                        else:
+                            if ts == target_position and model_input.flatten()[target_position] in target_features:
+                                regressor_inputs.append(target_activation)
+                                label = target_features.index(model_input.flatten()[target_position])
+                                regressor_class_labels.append(label)
 
             # Overwrite data using the new class label column
-            self.regressor_decoder_hidden_states = np.array(regressor_decoder_hidden_states)
+            self.regressor_inputs = np.array(regressor_inputs)
             self.regressor_label_column = np.array(regressor_class_labels)
 
-            self.length = 2 * num_positive
 
             self.target_feature_label_added = True  # Only allow this logic to be called once
 
 
-def perform_ablation_study(activations_dataset_path, target_feature, num_runs=1000, train_test_split=(0.9, 0.1),
+def perform_ablation_study(activations_dataset_path, target_features, target_position, input_for_prediction, num_runs=1000, train_test_split=(0.9, 0.1),
                            target_accuracy_cut=0.95):
     """
     Perform an ablation study by stepwise adding units to a subset until target accuracy is reached. The units are
@@ -104,18 +105,23 @@ def perform_ablation_study(activations_dataset_path, target_feature, num_runs=10
     # Load data and split into sets
     full_dataset = FunctionalGroupsDataset.load(activations_dataset_path, convert_to_numpy=True)
     full_dataset.add_dataset_for_regressor(
-        target_feature=target_feature, target_activations="hidden_activations_decoder"
+        target_features=target_features, target_activations=input_for_prediction,target_position=target_position
     )
 
     def train_regressor(X, y, training_indices, test_indices):
-        regressor = LogisticRegression()
+        regressor = LogisticRegression(n_jobs=-1, verbose=0, multi_class='multinomial',solver='saga', max_iter=100)
         regressor.fit(X[training_indices], y[training_indices])
 
         return regressor.score(X[test_indices], y[test_indices]), regressor.coef_
 
     # create input and target for regressor
-    X = full_dataset.regressor_decoder_hidden_states
+    X = full_dataset.regressor_inputs
     y = full_dataset.regressor_label_column
+
+    # majority classifier baseline
+    c = Counter(y)
+    majority_baseline = c.most_common(1)[0][1] / len(y)
+    print('Baseline (majority): ', majority_baseline)
 
     # create some train/test splits for testing the accuracies on equal conditions
     train_test_splits = []
@@ -139,10 +145,6 @@ def perform_ablation_study(activations_dataset_path, target_feature, num_runs=10
     baseline = np.mean(baseline_accuracies)
     print('Baseline (with all units): ', baseline)
 
-    # majority classifier baseline
-    majority_baseline = 1 - len(np.where(y == 1)[0]) / len(y)
-    print('Baseline (chance): ', majority_baseline)
-
     # target accuracy: depending on baseline
     target_accuracy = target_accuracy_cut * baseline
     print('Target accuracy: ', target_accuracy)
@@ -153,7 +155,7 @@ def perform_ablation_study(activations_dataset_path, target_feature, num_runs=10
     while subset_accuracy < target_accuracy:
         # add the next unit with highest weight in regressor
         subset.append(baseline_coefs.pop(0)[0])
-        X = full_dataset.regressor_decoder_hidden_states[:, subset].reshape(-1, len(subset))
+        X = full_dataset.regressor_inputs[:, subset].reshape(-1, len(subset))
         y = full_dataset.regressor_label_column
 
         # perform some runs to get average accuracy
@@ -170,6 +172,23 @@ def perform_ablation_study(activations_dataset_path, target_feature, num_runs=10
 
     return subset, subset_accuracy
 
+#Hidden units
+ACTIVATIONS_HIDDEN_UNITS_DECODER = 'hidden_activations_decoder'
+ACTIVATIONS_HIDDEN_UNITS_ENCODER = 'hidden_activations_encoder'
+
+#GRU Gates
+ACTIVATIONS_GRU_INPUT_GATE_DECODER = 'input_gate_activations_decoder'
+ACTIVATIONS_GRU_INPUT_GATE_ENCODER = 'input_gate_activations_encoder'
+ACTIVATIONS_GRU_RESET_GATE_DECODER = 'reset_gate_activations_decoder'
+ACTIVATIONS_GRU_RESET_GATE_ENCODER = 'reset_gate_activations_encoder'
+
+#LSTM Gates
+ACTIVATIONS_LSTM_INPUT_GATE_DECODER = 'input_gate_activations_decoder'
+ACTIVATIONS_LSTM_INPUT_GATE_ENCODER = 'input_gate_activations_encoder'
+ACTIVATIONS_LSTM_FORGET_GATE_DECODER = 'forget_gate_activations_decoder'
+ACTIVATIONS_LSTM_FORGET_GATE_ENCODER = 'forget_gate_activations_encoder'
+ACTIVATIONS_LSTM_OUTPUT_GATE_DECODER = 'output_gate_activations_decoder'
+ACTIVATIONS_LSTM_OUTPUT_GATE_ENCDODER = 'output_gate_activations_encoder'
 
 if __name__ == "__main__":
     # Input vocabulary indices (
@@ -193,11 +212,18 @@ if __name__ == "__main__":
     # t6: 8
     # t7: 17
 
-    target_feature = 3  # t1 = 3
-    activations_dataset_path = "./guided_gru_1_all.pt"
+    target_features = [3,4,5,6,7,8,17,18]  # tables = [3,4,5,6,7,8,17,18] # inputs = [10,14,9,13,12,15,11,16]
+    target_position = -1 # either a specific timestep or -1 for disregarding the timestep
+    activations_dataset_path = "./data/guided_gru_1_all.pt"
+    print(activations_dataset_path)
 
-    subset, subset_accuracy = perform_ablation_study(activations_dataset_path, target_feature)
+    input_for_prediction = ACTIVATIONS_HIDDEN_UNITS_ENCODER
 
+    # number of runs to get average of classifier weights
+    num_runs = 5
 
+    subset, subset_accuracy = perform_ablation_study(activations_dataset_path, target_features, target_position, input_for_prediction, num_runs=num_runs)
+
+    print('Size of functional group: ',len(subset))
 
 
