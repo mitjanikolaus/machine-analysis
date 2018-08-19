@@ -39,14 +39,14 @@ This repository contains the following modules:
 | Module name | Content | Used for report sections | 
 | -----------:|:------- |:------------------------ | 
 | ``activations.py`` | Store model activations in a special data set class | All |
-| ``baseline_guided_classification.py`` | | |
-| ``count_model_inspection.py`` | | |
-| ``count_prediction.py`` | | |
+| ``baseline_guided_classification.py`` | Train a classifier to preditct model type (baseline vs. guided) from encoder outputs| 4|
+| ``count_model_inspection.py`` | Ablation study for predicting timesteps using perceptron |  4.3 |
+| ``count_prediction.py`` | Ablation study for predicting timesteps using perceptron | 4.3 |
 | ``distributions.py`` | Quantify the distributions of activation  values and the change between time steps | 4.1, Appendix C |
 | ``functional_groups.py`` | Learn a diagnostic classifier in order to learn functional groups | 4.5 |
 | ``get_hidden_activations.py`` | Extract the activations produced by an model and store them in a special data set | All |
 | ``inspect_gate_activations.py`` | Produce gate saturation plots | 4.2 |
-| ``plots.py`` | | |
+| ``plots.py`` | Generate plots for ablation study with perceptron | 4.3 |
 | ``similar_activations.py`` | Show how similar activations for similar / dissimilar samples are | 4.4, Appendix A |
 | ``visualization.py`` | Create a variety of plots. | 4.1, Appendix C |  
 | ``models.analysable_cells.py`` | Create GRU and LSTM that allow the retrieval of their activations | All |
