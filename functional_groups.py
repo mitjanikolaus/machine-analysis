@@ -208,33 +208,35 @@ ACTIVATIONS_LSTM_FORGET_GATE_ENCODER = 'forget_gate_activations_encoder'
 ACTIVATIONS_LSTM_OUTPUT_GATE_DECODER = 'output_gate_activations_decoder'
 ACTIVATIONS_LSTM_OUTPUT_GATE_ENCODER = 'output_gate_activations_encoder'
 
-if __name__ == "__main__":
-    # Input vocabulary indices (
-    # '<pad>: 1
-    # 011: 10
-    # .: 2
-    # t1: 3
-    # 010: 14
-    # 101: 9
-    # 000: 13
-    # t2: 4
-    # 110: 12
-    # t4: 5
-    # t8: 18
-    # t5: 6
-    # < unk >: 0
-    # t3: 7
-    # 111: 15
-    # 100: 11
-    # 001: 16
-    # t6: 8
-    # t7: 17
+# Input vocabulary indices:
+# '<pad>: 1
+# 011: 10
+# .: 2
+# t1: 3
+# 010: 14
+# 101: 9
+# 000: 13
+# t2: 4
+# 110: 12
+# t4: 5
+# t8: 18
+# t5: 6
+# < unk >: 0
+# t3: 7
+# 111: 15
+# 100: 11
+# 001: 16
+# t6: 8
+# t7: 17
+FEATURES_TABLES = [3,4,5,6,7,8,17,18]
+FEATURES_INPUT_BITS = [10,14,9,13,12,15,11,16]
 
+if __name__ == "__main__":
     #activations_dataset_path = "./data/longer/guided_gru_1_all_with_longer.pt"
     activations_dataset_path = "./data/guided_gru_1_all.pt"
     print(activations_dataset_path)
 
-    input_for_prediction = ACTIVATIONS_HIDDEN_UNITS_ENCODER
+    input_for_prediction = ACTIVATIONS_HIDDEN_UNITS_DECODER
 
     # number of runs to get average of classifier weights
     num_runs = 5
@@ -243,11 +245,11 @@ if __name__ == "__main__":
     full_dataset = FunctionalGroupsDataset.load(activations_dataset_path, convert_to_numpy=True)
 
     #either add dataset for prediction of specific input features:
-    target_features = [3, 4, 5, 6, 7, 8, 17, 18]  # tables = [3,4,5,6,7,8,17,18] # input bits = [10,14,9,13,12,15,11,16]
+    target_features = FEATURES_TABLES
     target_position = -1  # either a specific timestep or -1 for disregarding the timestep
     full_dataset.add_dataset_for_regressor(target_features, input_for_prediction, target_position)
 
-    #or add dataset for prediction of timesteps (be sure to use also a dataset with longer sequences!):
+    #or add dataset for prediction of timesteps:
     #full_dataset.add_dataset_for_regressor_predicting_timestep(target_activations=input_for_prediction)
 
     subset, subset_accuracy = perform_ablation_study(full_dataset, num_runs=num_runs)
