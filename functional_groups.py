@@ -232,28 +232,29 @@ FEATURES_TABLES = [3,4,5,6,7,8,17,18]
 FEATURES_INPUT_BITS = [10,14,9,13,12,15,11,16]
 
 if __name__ == "__main__":
-    #activations_dataset_path = "./data/longer/guided_gru_1_all_with_longer.pt"
-    activations_dataset_path = "./data/guided_gru_1_all.pt"
-    print(activations_dataset_path)
+    for index in range(1,6):
+        activations_dataset_path = "./data/guided_gru_"+str(index)+"_all.pt"
+        print("\n\n\nModel: {}".format(activations_dataset_path))
+        print(activations_dataset_path)
 
-    input_for_prediction = ACTIVATIONS_HIDDEN_UNITS_DECODER
+        input_for_prediction = ACTIVATIONS_HIDDEN_UNITS_ENCODER
 
-    # number of runs to get average of classifier weights
-    num_runs = 5
+        # number of runs to get average of classifier weights
+        num_runs = 5
 
-    # Load data
-    full_dataset = FunctionalGroupsDataset.load(activations_dataset_path, convert_to_numpy=True)
+        # Load data
+        full_dataset = FunctionalGroupsDataset.load(activations_dataset_path, convert_to_numpy=True)
 
-    #either add dataset for prediction of specific input features:
-    target_features = FEATURES_TABLES
-    target_position = -1  # either a specific timestep or -1 for disregarding the timestep
-    full_dataset.add_dataset_for_regressor(target_features, input_for_prediction, target_position)
+        #either add dataset for prediction of specific input features:
+        target_features = FEATURES_TABLES
+        target_position = -1  # either a specific timestep or -1 for disregarding the timestep
+        full_dataset.add_dataset_for_regressor(target_features, input_for_prediction, target_position)
 
-    #or add dataset for prediction of timesteps:
-    #full_dataset.add_dataset_for_regressor_predicting_timestep(target_activations=input_for_prediction)
+        #or add dataset for prediction of timesteps:
+        # full_dataset.add_dataset_for_regressor_predicting_timestep(target_activations=input_for_prediction)
 
-    subset, subset_accuracy = perform_ablation_study(full_dataset, num_runs=num_runs)
+        subset, subset_accuracy = perform_ablation_study(full_dataset, num_runs=num_runs)
 
-    print('Size of functional group: ',len(subset))
+        print('Size of functional group: ',len(subset))
 
 
